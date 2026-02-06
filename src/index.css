@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100dvh; /* Dynamic viewport height - accounts for mobile browser chrome */
+  width: 100%;
+  overflow: hidden; /* Prevent page scrolling */
+}
+
+body {
+  background: 
+    linear-gradient(160deg, rgba(10, 22, 18, 0.6) 0%, rgba(13, 26, 22, 0.65) 40%, rgba(17, 26, 20, 0.65) 70%, rgba(10, 15, 13, 0.7) 100%),
+    url('/images/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Flip card animation */
+.flip-card {
+  perspective: 1000px;
+  /* GPU acceleration */
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.4s ease-out; /* Faster, smoother */
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  /* GPU acceleration */
+  will-change: transform;
+}
+
+/* Disable animation when switching cards */
+.flip-card.no-animation .flip-card-inner {
+  transition: none;
+}
+
+.flip-card.flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  backface-visibility: hidden;
+  /* GPU acceleration for both faces */
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.flip-card-front {
+  z-index: 2;
+}
+
+.flip-card.flipped .flip-card-front {
+  z-index: 0;
+}
+
+.flip-card.flipped .flip-card-back {
+  z-index: 2;
+}
+
+/* Pointer events: only the visible face should receive clicks */
+.flip-card .flip-card-front {
+  pointer-events: auto;
+}
+
+.flip-card .flip-card-back {
+  pointer-events: none;
+}
+
+.flip-card.flipped .flip-card-front {
+  pointer-events: none;
+}
+
+.flip-card.flipped .flip-card-back {
+  pointer-events: auto;
+}
+
+/* Hover effect for cards - only on desktop, not flipped */
+@media (hover: hover) {
+  .flip-card:not(.flipped):hover {
+    transform: translateY(-2px) scale(1.02);
+    filter: brightness(1.1);
+  }
+}
+
+/* Landscape orientation overlay for mobile */
+.landscape-warning {
+  display: none;
+}
+
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  .landscape-warning {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 22, 18, 0.97);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: white;
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .landscape-warning svg {
+    width: 64px;
+    height: 64px;
+    color: #5eead4;
+    animation: rotate-hint 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes rotate-hint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+  }
+  
+  .main-content {
+    display: none;
+  }
+}
+
+/* No image transition - instant card switch */
+
+.flip-card-back {
+  transform: rotateY(180deg);
+  z-index: 1;
+}
+
+/* Hide scrollbar for carousel */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
