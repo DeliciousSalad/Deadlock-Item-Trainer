@@ -132,7 +132,7 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   const renderWindow = useMemo(() => {
     if (containerWidth === 0) return 4; // Default before measurement
     
-    const cardWidth = Math.min(containerWidth * 0.70, 300);
+    const cardWidth = Math.min(containerWidth * 0.60, 260);
     const gap = 16;
     
     // How many cards fit in the viewport (approximately)
@@ -144,16 +144,16 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   
   // Calculate spacer width to center first/last cards
   // spacer = (container - cardWidth) / 2 - gap
-  // cardWidth = min(70%, 300px)
+  // cardWidth = min(60%, 260px)
   // Use JavaScript when containerWidth is known, CSS calc as fallback
   const spacerWidth = useMemo(() => {
     if (containerWidth > 0) {
-      const cardWidth = Math.min(containerWidth * 0.70, 300);
+      const cardWidth = Math.min(containerWidth * 0.60, 260);
       const spacer = (containerWidth - cardWidth) / 2 - 16;
       return `${Math.max(0, spacer)}px`;
     }
     // Fallback to CSS calc for initial render
-    return 'calc(max(0px, (100% - min(70%, 300px)) / 2 - 16px))';
+    return 'calc(max(0px, (100% - min(60%, 260px)) / 2 - 16px))';
   }, [containerWidth]);
   
   // Mouse/touch drag state
@@ -837,7 +837,7 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
         const isActive = index === currentIndex;
         const containerStyle: React.CSSProperties = {
           flexShrink: 0,
-          width: '70%',
+          width: 'min(60%, 260px)',
           maxWidth: '300px',
           height: '100%',
           opacity: isActive ? 1 : 0.6,

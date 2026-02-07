@@ -652,7 +652,7 @@ function App() {
           />
         </div>
         <p style={{ 
-          color: '#fff0dc', 
+          color: '#fae9d0', 
           fontSize: 'clamp(0.75rem, 3vw, 1rem)', 
           margin: 0,
           fontWeight: 700,

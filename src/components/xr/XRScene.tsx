@@ -284,7 +284,7 @@ function LogoHeader3D({ position, itemCount, patchDate }: {
       ctx.filter = 'none';
 
       // "Item Trainer" text
-      ctx.fillStyle = '#fff0dc';
+      ctx.fillStyle = '#fae9d0';
       ctx.font = 'bold 26px Georgia, "Times New Roman", serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';

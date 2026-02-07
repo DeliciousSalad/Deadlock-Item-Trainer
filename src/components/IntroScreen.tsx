@@ -36,7 +36,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
             className="text-xl md:text-2xl font-bold"
             style={{ 
               fontFamily: 'Georgia, "Times New Roman", serif',
-              color: '#e8a849',
+              color: '#fae9d0',
             }}
           >
             Item Trainer
