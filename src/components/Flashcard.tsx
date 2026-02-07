@@ -391,10 +391,12 @@ export function Flashcard({ item, showAnswer: externalShowAnswer, onFlip, isImag
           width: '100%',
           aspectRatio: `${BASE_CARD_WIDTH} / ${BASE_CARD_HEIGHT}`,
           maxHeight: '100%',
+          // Disable double-tap-zoom delay so click/tap fires immediately on touch
+          touchAction: 'manipulation',
           // When height is the constraint, width adjusts via aspect-ratio
           // object-fit doesn't work on divs, but aspect-ratio handles this
         }}
-        onMouseEnter={() => playHoverSound(item.type)}
+        onPointerEnter={() => playHoverSound(item.type)}
       >
         <div className="flip-card-inner">
         {/* Front of card - click to flip */}

@@ -5,7 +5,11 @@ import { Navigation } from './components/Navigation';
 import { MusicPlayer } from './components/MusicPlayer';
 import { IntroScreen } from './components/IntroScreen';
 import { CardCarousel, type CardCarouselHandle } from './components/CardCarousel';
+import { XRButton } from './components/xr/XRButton';
+import { XRScene } from './components/xr/XRScene';
+import { DebugOverlay } from './components/xr/DebugOverlay';
 import type { ProcessedItem, ComponentItem, ItemCategory, RawItem } from './types';
+
 import { ITEMS_API_URL } from './constants';
 import { 
   formatName, 
@@ -37,6 +41,64 @@ function App() {
   const [category, setCategory] = useState<ItemCategory>('all');
   const [tier, setTier] = useState<number | null>(null);
   const [sort, setSort] = useState<SortOption>('default');
+
+  // XR mode
+  const [xrActive, setXrActive] = useState(false);
+
+  // Listen for XR session end to return to 2D UI.
+  // Key: only react to session=null AFTER a session has been confirmed,
+  // to avoid a race condition where enterAR() hasn't completed yet on re-entry.
+  useEffect(() => {
+    if (!xrActive) return;
+
+    let unsubscribeStore: (() => void) | undefined;
+    let sessionConfirmed = false;
+    let endListenerSession: XRSession | null = null;
+    const onEnd = () => setXrActive(false);
+
+    import('./components/xr/xrStore').then(({ xrStore }) => {
+      // Check if a session already exists (fast re-subscribe)
+      const existing = xrStore.getState().session;
+      if (existing) {
+        sessionConfirmed = true;
+        endListenerSession = existing;
+        existing.addEventListener('end', onEnd);
+      }
+
+      // Watch for store state changes
+      unsubscribeStore = xrStore.subscribe((state: any) => {
+        if (state.session && !sessionConfirmed) {
+          // Session just appeared — attach end listener & mark confirmed
+          sessionConfirmed = true;
+          endListenerSession = state.session;
+          state.session.addEventListener('end', onEnd);
+        } else if (!state.session && sessionConfirmed) {
+          // Session went away after being confirmed — exit XR
+          setXrActive(false);
+        }
+      });
+    });
+
+    return () => {
+      unsubscribeStore?.();
+      if (endListenerSession) {
+        endListenerSession.removeEventListener('end', onEnd);
+      }
+    };
+  }, [xrActive]);
+
+  // When returning from XR, scroll the 2D carousel to the current active card
+  const prevXrActiveRef = useRef(xrActive);
+  useEffect(() => {
+    if (prevXrActiveRef.current && !xrActive) {
+      // XR just ended — jump carousel to current card after a brief delay
+      // to let the hidden 2D UI become visible and layout
+      setTimeout(() => {
+        carouselRef.current?.scrollToIndex(currentIndex, true);
+      }, 50);
+    }
+    prevXrActiveRef.current = xrActive;
+  }, [xrActive, currentIndex]);
 
   // Wrapper to reset sort if it becomes redundant when changing category
   const handleCategoryChange = useCallback((newCategory: ItemCategory) => {
@@ -320,24 +382,24 @@ function App() {
       const newIndex = currentIndex - 1;
       setFlippedIndex(null); // Flip back before navigating
       setCurrentIndex(newIndex);
-      // Play sound for new card
-      if (filteredItems[newIndex]) {
+      // Play sound for new card (spatial audio handled in Carousel3D when XR is active)
+      if (!xrActive && filteredItems[newIndex]) {
         playActiveSound(filteredItems[newIndex].type);
       }
     }
-  }, [currentIndex, filteredItems]);
+  }, [currentIndex, filteredItems, xrActive]);
 
   const goToNext = useCallback(() => {
     if (currentIndex < filteredItems.length - 1) {
       const newIndex = currentIndex + 1;
       setFlippedIndex(null); // Flip back before navigating
       setCurrentIndex(newIndex);
-      // Play sound for new card
-      if (filteredItems[newIndex]) {
+      // Play sound for new card (spatial audio handled in Carousel3D when XR is active)
+      if (!xrActive && filteredItems[newIndex]) {
         playActiveSound(filteredItems[newIndex].type);
       }
     }
-  }, [currentIndex, filteredItems]);
+  }, [currentIndex, filteredItems, xrActive]);
 
   // Use refs to always have latest navigation functions for keyboard handler
   const goToPreviousRef = useRef(goToPrevious);
@@ -382,32 +444,32 @@ function App() {
     setCurrentIndex(0);
     setFlippedIndex(null);
     setSort('shuffled');
-    // Play sound for first card of shuffled deck
-    if (shuffled[0]) {
+    // Play sound for first card (spatial audio handled in Carousel3D when XR is active)
+    if (!xrActive && shuffled[0]) {
       playActiveSound(shuffled[0].type);
     }
-  }, [filteredItems]);
+  }, [filteredItems, xrActive]);
 
   const reset = useCallback(() => {
     setCurrentIndex(0);
     setFlippedIndex(null);
-    // Play sound for first card
-    if (filteredItems[0]) {
+    // Play sound for first card (spatial audio handled in Carousel3D when XR is active)
+    if (!xrActive && filteredItems[0]) {
       playActiveSound(filteredItems[0].type);
     }
-  }, [filteredItems]);
+  }, [filteredItems, xrActive]);
 
   const goToEnd = useCallback(() => {
     const lastIndex = filteredItems.length - 1;
     if (lastIndex >= 0) {
       setCurrentIndex(lastIndex);
       setFlippedIndex(null);
-      // Play sound for last card
-      if (filteredItems[lastIndex]) {
+      // Play sound for last card (spatial audio handled in Carousel3D when XR is active)
+      if (!xrActive && filteredItems[lastIndex]) {
         playActiveSound(filteredItems[lastIndex].type);
       }
     }
-  }, [filteredItems]);
+  }, [filteredItems, xrActive]);
 
   // Handle index change from carousel scroll
   const handleCarouselIndexChange = useCallback((newIndex: number) => {
@@ -501,6 +563,34 @@ function App() {
 
   return (
     <>
+      {/* XR Canvas — always mounted so WebXR manager is ready, but content only
+          renders when XR is active to avoid loading textures in 2D mode */}
+      <XRScene
+        active={xrActive}
+        items={filteredItems}
+        currentIndex={currentIndex}
+        flippedIndex={flippedIndex}
+        category={category}
+        tier={tier}
+        sort={sort}
+        patchDate={patchDate}
+        onFlip={handleCarouselFlip}
+        onIndexChange={handleCarouselIndexChange}
+        onPrevious={goToPrevious}
+        onNext={goToNext}
+        onShuffle={shuffle}
+        onReset={reset}
+        onGoToEnd={goToEnd}
+        onCategoryChange={handleCategoryChange}
+        onTierChange={handleTierChange}
+        onSortChange={setSort}
+      />
+
+      {/* XR Entry Button - only shows on supported devices */}
+      <XRButton onEnterXR={() => setXrActive(true)} category={category} />
+
+      {/* 2D UI — hidden (not unmounted) when XR is active so it's ready when returning */}
+      <div style={{ display: xrActive ? 'none' : 'contents' }}>
       {/* Landscape warning overlay */}
       <div className="landscape-warning">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -728,9 +818,11 @@ function App() {
         </p>
       </footer>
     </div>
+    </div>
 
     {/* Music player toggle - starts playing automatically */}
     <MusicPlayer autoPlay={true} categoryFilter={category} />
+    <DebugOverlay />
     </>
   );
 }

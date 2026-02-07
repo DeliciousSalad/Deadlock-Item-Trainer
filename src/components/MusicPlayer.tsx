@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { hapticTap } from '../utils/haptics';
-import { getMusicVolume, setMusicVolume, getSfxVolume, setSfxVolume } from '../utils/volume';
+import { getMusicVolume, setMusicVolume, getSfxVolume, setSfxVolume, onMusicVolumeChange } from '../utils/volume';
 
 // Get the base URL from Vite
 const BASE_URL = import.meta.env.BASE_URL || '/';
@@ -148,6 +148,27 @@ export function MusicPlayer({ autoPlay = false, categoryFilter = 'all' }: MusicP
       startPlayback(pauseTimeRef.current);
       setIsPlaying(true);
     }
+  }, [isPlaying, startPlayback]);
+
+  // Sync when XR slider (or any external caller) changes the global music volume
+  useEffect(() => {
+    return onMusicVolumeChange((vol) => {
+      setMusicVol(vol);
+      if (gainNodeRef.current) {
+        gainNodeRef.current.gain.value = vol;
+      }
+      if (vol === 0) {
+        if (sourceNodeRef.current && audioContextRef.current) {
+          pauseTimeRef.current = audioContextRef.current.currentTime - startTimeRef.current;
+          try { sourceNodeRef.current.stop(); } catch { /* ignore */ }
+          sourceNodeRef.current = null;
+        }
+        setIsPlaying(false);
+      } else if (!isPlaying && audioBufferRef.current) {
+        startPlayback(pauseTimeRef.current);
+        setIsPlaying(true);
+      }
+    });
   }, [isPlaying, startPlayback]);
 
   const handleSfxVolume = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
