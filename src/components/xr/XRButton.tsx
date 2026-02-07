@@ -3,7 +3,7 @@ import { xrStore } from './xrStore';
 import type { ItemCategory } from '../../types';
 
 const TYPE_THEME: Record<string, { grad0: string; grad1: string; border: string; glow: string }> = {
-  all:      { grad0: '#6366f1', grad1: '#8b5cf6', border: '#a78bfa', glow: 'rgba(139, 92, 246, 0.4)' },
+  all:      { grad0: '#92713a', grad1: '#b8943e', border: '#d4b16a', glow: 'rgba(212, 177, 106, 0.3)' },
   weapon:   { grad0: '#d97706', grad1: '#f59e0b', border: '#fbbf24', glow: 'rgba(245, 158, 11, 0.4)' },
   vitality: { grad0: '#059669', grad1: '#10b981', border: '#6ee7b7', glow: 'rgba(16, 185, 129, 0.4)' },
   spirit:   { grad0: '#7c3aed', grad1: '#8b5cf6', border: '#a78bfa', glow: 'rgba(139, 92, 246, 0.4)' },

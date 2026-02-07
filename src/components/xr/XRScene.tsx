@@ -12,26 +12,49 @@ import type { ProcessedItem, ItemCategory } from '../../types';
 import type { SortOption } from '../FilterBar';
 
 /**
- * Wrapper that samples the XR camera's Y position on the first few frames
- * and positions its children so that Y=0 in child space = the user's eye level.
- * This works with any reference space (local-floor, local, etc).
+ * Wrapper that samples the XR camera's Y position and positions its children
+ * so that Y=0 in child space = the user's eye level.
+ * Keeps sampling until a stable reading is found, then smoothly locks on.
  */
 function EyeLevelGroup({ children }: { children: ReactNode }) {
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
   const eyeY = useRef<number | null>(null);
-  const sampleCount = useRef(0);
+  const settled = useRef(false);
+  const samples = useRef<number[]>([]);
+  const frameCount = useRef(0);
 
   useFrame(() => {
-    // Sample camera Y over the first 30 frames to get a stable reading
-    if (sampleCount.current < 30) {
-      const camY = camera.position.y;
-      if (camY > 0.1) { // Ignore zero/invalid readings
-        eyeY.current = camY;
+    frameCount.current++;
+    const camY = camera.position.y;
+
+    if (!settled.current) {
+      // Keep collecting valid samples until we have enough for a stable average
+      if (camY > 0.1) {
+        samples.current.push(camY);
+
+        // Need at least 5 valid samples, and at least 10 frames have passed
+        // (gives XR session time to initialize)
+        if (samples.current.length >= 5 && frameCount.current >= 10) {
+          // Use median to reject outliers
+          const sorted = [...samples.current].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          eyeY.current = sorted.length % 2 !== 0
+            ? sorted[mid]
+            : (sorted[mid - 1] + sorted[mid]) / 2;
+          settled.current = true;
+        }
       }
-      sampleCount.current++;
+
+      // Safety: if after 300 frames we still don't have a reading,
+      // accept any valid sample we've collected
+      if (!settled.current && frameCount.current >= 300 && samples.current.length > 0) {
+        eyeY.current = samples.current[samples.current.length - 1];
+        settled.current = true;
+      }
     }
 
+    // Apply position
     if (groupRef.current && eyeY.current !== null) {
       groupRef.current.position.y = eyeY.current;
     }
