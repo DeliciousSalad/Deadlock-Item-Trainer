@@ -100,6 +100,7 @@ export interface RawItem {
     active_desc?: string;
     active?: string;
     english?: string;
+    tooltip?: string;
   };
   properties?: Record<string, RawItemProperty>;
   tooltip_sections?: RawTooltipSection[];

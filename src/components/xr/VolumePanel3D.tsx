@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getMusicVolume, setMusicVolume, getSfxVolume, setSfxVolume } from '../../utils/volume';
 

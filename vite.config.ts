@@ -3,10 +3,13 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
+const isGitHubPages = process.env.DEPLOY_TARGET === 'ghpages';
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), basicSsl()],
-  base: '/DeadlockFlashcards/', // Your repo name
+  // Use '/DeadlockFlashcards/' for GitHub Pages, '/' for Cloudflare Pages / custom domain
+  base: isGitHubPages ? '/DeadlockFlashcards/' : '/',
   server: {
     host: true, // Expose to local network
     hmr: false, // Disable HMR to prevent unwanted refreshes on mobile

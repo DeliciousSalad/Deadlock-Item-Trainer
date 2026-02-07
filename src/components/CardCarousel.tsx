@@ -74,7 +74,7 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   // Use a counter instead of boolean to handle overlapping programmatic scrolls
   const programmaticScrollCountRef = useRef(0);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastIndexRef = useRef(currentIndex);
   // Track when user is interacting - prevents useEffect from interfering
   const userInteractionRef = useRef(false);
@@ -357,7 +357,7 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   const scrollRafRef = useRef<number | null>(null);
   const lastVisibleRangeUpdateRef = useRef(0);
   const pendingFeedbackRef = useRef<string | null>(null); // Track pending haptic/sound
-  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   
   // Handle scroll events (only for user-initiated scrolls)
   const handleScroll = useCallback(() => {
@@ -709,7 +709,7 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   // Track previous index to keep cards loaded during transitions
   const prevIndexRef = useRef(currentIndex);
   const transitionIndexRef = useRef<number | null>(null);
-  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [, forceUpdate] = useState(0); // Used to trigger re-render when transition ends
   
   // Detect index change synchronously during render

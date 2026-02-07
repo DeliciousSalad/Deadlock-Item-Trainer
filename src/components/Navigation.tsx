@@ -49,7 +49,7 @@ const typeColors: Record<string, { fill: string; bg: string; border: string; tex
 export function Navigation({
   currentIndex,
   total,
-  currentType,
+  currentType: _currentType,
   categoryFilter = 'all',
   onPrevious,
   onNext,

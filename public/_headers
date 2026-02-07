@@ -1,0 +1,22 @@
+# Cache static assets aggressively (hashed filenames from Vite)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Audio files — cache for 1 week
+/audio/*
+  Cache-Control: public, max-age=604800
+
+# Images — cache for 1 week
+/images/*
+  Cache-Control: public, max-age=604800
+
+# HTML — revalidate every time
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Security headers for all pages
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: xr-spatial-tracking=(self)

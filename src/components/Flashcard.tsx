@@ -7,7 +7,6 @@ import { playHoverSound, playFlipSound } from '../utils/sounds';
 // Base card dimensions - will scale responsively
 const BASE_CARD_WIDTH = 280;
 const BASE_CARD_HEIGHT = 380;
-const CARD_ASPECT_RATIO = BASE_CARD_HEIGHT / BASE_CARD_WIDTH;
 
 interface FlashcardProps {
   item: ProcessedItem;
@@ -159,7 +158,7 @@ function parseDescription(description: string): React.ReactNode {
   // We need to process these specially because the non-greedy regex gets confused
   cleaned = cleaned.replace(
     /<span[^>]*class="highlight"[^>]*>(<img[^>]*\/>)(<span[^>]*class="inline-attribute-label[^"]*"[^>]*>([^<]*)<\/span>)<\/span>/gi,
-    (match, img, innerSpan, innerText) => {
+    (_match, img, _innerSpan, innerText) => {
       // Replace the nested structure with the img followed by the styled text
       return `${img}<span class="inline-attribute-label">${innerText}</span>`;
     }
