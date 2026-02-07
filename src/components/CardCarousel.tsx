@@ -81,8 +81,9 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   // Track timestamp of last scroll-initiated index change
   const lastScrollChangeTimeRef = useRef(0);
   
-  // Track container width for dynamic render window
+  // Track container size for dynamic render window + height-driven card sizing
   const [containerWidth, setContainerWidth] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
   
   // Image cache - loads images as they come into view
   const [loadedImages, setLoadedImages] = useState<Map<number, string>>(new Map());
@@ -108,18 +109,19 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
     const container = scrollRef.current;
     if (!container) return;
     
-    const updateWidth = () => {
-      // Use the actual container width for consistency with scroll calculations
+    const updateSize = () => {
+      // Use the actual container dimensions for consistency with scroll calculations
       if (scrollRef.current) {
         setContainerWidth(scrollRef.current.offsetWidth);
+        setContainerHeight(scrollRef.current.offsetHeight);
       }
     };
     
     // Initial measurement after a short delay to ensure layout is complete
-    const timer = setTimeout(updateWidth, 50);
+    const timer = setTimeout(updateSize, 50);
     
     // Use ResizeObserver for responsive updates
-    const resizeObserver = new ResizeObserver(updateWidth);
+    const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(container);
     
     return () => {
@@ -128,33 +130,36 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
     };
   }, []);
   
+  // Height-driven card width: fill vertical space, let aspect-ratio set width
+  const CARD_ASPECT = 280 / 380; // must match Flashcard BASE_CARD_WIDTH/HEIGHT
+  const ROTATION_CLEARANCE = 24; // 12px top + 12px bottom so flipped cards don't clip
+
+  const computedCardWidth = useMemo(() => {
+    if (containerWidth === 0) return 260; // fallback
+    if (containerHeight > 0) {
+      const maxH = containerHeight - ROTATION_CLEARANCE;
+      // Width from height via aspect ratio, capped by viewport width
+      return Math.min(maxH * CARD_ASPECT, containerWidth * 0.75, 340);
+    }
+    return Math.min(containerWidth * 0.60, 260);
+  }, [containerWidth, containerHeight]);
+
   // Calculate render window based on container width
   const renderWindow = useMemo(() => {
     if (containerWidth === 0) return 4; // Default before measurement
-    
-    const cardWidth = Math.min(containerWidth * 0.60, 260);
     const gap = 16;
-    
-    // How many cards fit in the viewport (approximately)
-    const visibleCards = Math.ceil(containerWidth / (cardWidth + gap));
-    
-    // Add buffer of 2-3 cards on each side for smooth scrolling and flip animations
+    const visibleCards = Math.ceil(containerWidth / (computedCardWidth + gap));
     return Math.max(3, Math.ceil(visibleCards / 2) + 3);
-  }, [containerWidth]);
+  }, [containerWidth, computedCardWidth]);
   
   // Calculate spacer width to center first/last cards
-  // spacer = (container - cardWidth) / 2 - gap
-  // cardWidth = min(60%, 260px)
-  // Use JavaScript when containerWidth is known, CSS calc as fallback
   const spacerWidth = useMemo(() => {
     if (containerWidth > 0) {
-      const cardWidth = Math.min(containerWidth * 0.60, 260);
-      const spacer = (containerWidth - cardWidth) / 2 - 16;
+      const spacer = (containerWidth - computedCardWidth) / 2 - 16;
       return `${Math.max(0, spacer)}px`;
     }
-    // Fallback to CSS calc for initial render
     return 'calc(max(0px, (100% - min(60%, 260px)) / 2 - 16px))';
-  }, [containerWidth]);
+  }, [containerWidth, computedCardWidth]);
   
   // Mouse/touch drag state
   const isDraggingRef = useRef(false);
@@ -219,6 +224,54 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
       scrollToIndexFn(index, !instant); // smooth = !instant
     }
   }), [scrollToIndexFn]);
+
+  // Mousewheel navigation — each wheel tick = one card
+  const wheelCooldownRef = useRef(0);
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // If the target is inside a scrollable element (e.g. card back stats),
+      // let it scroll naturally instead of changing cards
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        let el: HTMLElement | null = target;
+        while (el && el !== container) {
+          const style = window.getComputedStyle(el);
+          const overflowY = style.overflowY;
+          if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+            return; // scrollable child has content to scroll — defer to it
+          }
+          el = el.parentElement;
+        }
+      }
+
+      // Ignore tiny deltas (trackpad coasting)
+      if (Math.abs(e.deltaY) < 5) return;
+
+      const now = Date.now();
+      if (now - wheelCooldownRef.current < 80) return; // debounce
+      wheelCooldownRef.current = now;
+
+      e.preventDefault();
+
+      // Cancel any in-flight animation so the next card starts immediately
+      cancelSmoothScroll();
+
+      const dir = e.deltaY > 0 ? 1 : -1;
+      const nextIndex = currentIndex + dir;
+      if (nextIndex >= 0 && nextIndex < items.length) {
+        if (items[nextIndex]) {
+          playActiveSound(items[nextIndex].type);
+        }
+        onIndexChange(nextIndex);
+      }
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, [currentIndex, items, onIndexChange]);
 
   // Re-center current card when container width changes (e.g., window resize)
   // Skip the very first render to avoid fighting with initial layout
@@ -837,12 +890,10 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
         const isActive = index === currentIndex;
         const containerStyle: React.CSSProperties = {
           flexShrink: 0,
-          width: 'min(60%, 260px)',
-          maxWidth: '300px',
+          width: `${computedCardWidth}px`,
           height: '100%',
           opacity: isActive ? 1 : 0.6,
           transform: isActive ? 'scale(1)' : 'scale(0.92)',
-          // Minimal transition - just enough to not be jarring
           transition: 'opacity 0.1s, transform 0.1s',
         };
         
