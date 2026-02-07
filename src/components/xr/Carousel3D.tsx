@@ -62,6 +62,7 @@ export function Carousel3D({
   const lastHandXRef = useRef(0);
   const lastHandTimeRef = useRef(0);
   const velocityRef = useRef(0);
+  const isPhonePointerRef = useRef(false); // true when dragging via touch, not XR controller
 
   // Momentum
   const momentumRef = useRef(0);
@@ -151,12 +152,43 @@ export function Carousel3D({
     velocityRef.current = 0;
     needsStartCaptureRef.current = true;
     lastHandTimeRef.current = performance.now();
+    // Capture initial world X for phone/touch drag (via drag plane)
+    isPhonePointerRef.current = false;
+    if (e.point) {
+      pointerStartXRef.current = e.point.x;
+      lastHandXRef.current = e.point.x;
+    }
   }, []);
 
   const handleCardPointerUp = useCallback((e: any) => {
     e.stopPropagation();
     handleRelease();
   }, [handleRelease]);
+
+  const handleCardPointerMove = useCallback((e: any) => {
+    if (!pointerActiveRef.current) return;
+    e.stopPropagation();
+    if (!e.point) return;
+
+    // This is a phone/touch pointer move — mark as phone mode
+    isPhonePointerRef.current = true;
+
+    const currentX = e.point.x;
+    const now = performance.now();
+    const dt = (now - lastHandTimeRef.current) / 1000;
+
+    const totalDelta = currentX - pointerStartXRef.current;
+    if (!isDraggingRef.current && Math.abs(totalDelta) > CLICK_THRESHOLD) {
+      isDraggingRef.current = true;
+    }
+    if (isDraggingRef.current) {
+      if (dt > 0.001) velocityRef.current = (currentX - lastHandXRef.current) / dt;
+      scrollOffsetRef.current = pointerStartOffsetRef.current - totalDelta * DRAG_SENSITIVITY;
+      scrollOffsetRef.current = Math.max(-0.3, Math.min(itemsRef.current.length - 0.7, scrollOffsetRef.current));
+    }
+    lastHandXRef.current = currentX;
+    lastHandTimeRef.current = now;
+  }, []);
 
   const handleCardPointerEnter = useCallback((cardIndex: number, e: any) => {
     e.stopPropagation();
@@ -185,22 +217,43 @@ export function Carousel3D({
       hoverCooldownRef.current = Math.max(0, hoverCooldownRef.current - delta);
     }
 
-    // Hand tracking while pointer held
+    // XR input tracking while pointer is held
     if (pointerActiveRef.current) {
-      let triggerStillPressed = false;
+      let inputHandled = false;
       let currentHandX = lastHandXRef.current;
+
       try {
         const gl = state.gl;
         const session = gl.xr.getSession();
         if (session) {
+          const frame = gl.xr.getFrame();
+          const refSpace = gl.xr.getReferenceSpace();
+
           for (const source of session.inputSources) {
-            if (source.gamepad && source.gamepad.buttons[0]?.pressed) {
-              triggerStillPressed = true;
-              const frame = gl.xr.getFrame();
-              const refSpace = gl.xr.getReferenceSpace();
-              if (frame && refSpace && source.targetRaySpace) {
-                const pose = frame.getPose(source.targetRaySpace, refSpace);
-                if (pose) currentHandX = pose.transform.position.x;
+            // XR controller with gamepad (Quest, etc.)
+            if (source.gamepad) {
+              if (source.gamepad.buttons[0]?.pressed) {
+                inputHandled = true;
+                if (frame && refSpace && source.targetRaySpace) {
+                  const pose = frame.getPose(source.targetRaySpace, refSpace);
+                  if (pose) currentHandX = pose.transform.position.x;
+                }
+              } else {
+                // Controller exists but trigger released → end drag
+                handleRelease();
+                inputHandled = true;
+              }
+              break;
+            }
+
+            // Phone screen touch (targetRayMode === 'screen')
+            if (source.targetRayMode === 'screen' && frame && refSpace && source.targetRaySpace) {
+              inputHandled = true;
+              isPhonePointerRef.current = true;
+              const pose = frame.getPose(source.targetRaySpace, refSpace);
+              if (pose) {
+                // Use ray origin X for horizontal tracking
+                currentHandX = pose.transform.position.x;
               }
               break;
             }
@@ -208,27 +261,26 @@ export function Carousel3D({
         }
       } catch { /* ignore */ }
 
-      if (triggerStillPressed) {
+      if (inputHandled && pointerActiveRef.current) {
         if (needsStartCaptureRef.current) {
           pointerStartXRef.current = currentHandX;
           lastHandXRef.current = currentHandX;
           needsStartCaptureRef.current = false;
+        } else {
+          const now = performance.now();
+          const dt = (now - lastHandTimeRef.current) / 1000;
+          const totalDelta = currentHandX - pointerStartXRef.current;
+          if (!isDraggingRef.current && Math.abs(totalDelta) > CLICK_THRESHOLD) {
+            isDraggingRef.current = true;
+          }
+          if (isDraggingRef.current) {
+            if (dt > 0.001) velocityRef.current = (currentHandX - lastHandXRef.current) / dt;
+            scrollOffsetRef.current = pointerStartOffsetRef.current - totalDelta * DRAG_SENSITIVITY;
+            scrollOffsetRef.current = Math.max(-0.3, Math.min(itms.length - 0.7, scrollOffsetRef.current));
+          }
+          lastHandXRef.current = currentHandX;
+          lastHandTimeRef.current = now;
         }
-        const now = performance.now();
-        const dt = (now - lastHandTimeRef.current) / 1000;
-        const totalDelta = currentHandX - pointerStartXRef.current;
-        if (!isDraggingRef.current && Math.abs(totalDelta) > CLICK_THRESHOLD) {
-          isDraggingRef.current = true;
-        }
-        if (isDraggingRef.current) {
-          if (dt > 0.001) velocityRef.current = (currentHandX - lastHandXRef.current) / dt;
-          scrollOffsetRef.current = pointerStartOffsetRef.current - totalDelta * DRAG_SENSITIVITY;
-          scrollOffsetRef.current = Math.max(-0.3, Math.min(itms.length - 0.7, scrollOffsetRef.current));
-        }
-        lastHandXRef.current = currentHandX;
-        lastHandTimeRef.current = now;
-      } else {
-        handleRelease();
       }
     }
 
@@ -330,6 +382,7 @@ export function Carousel3D({
 
   return (
     <group position={position}>
+
       {items.length > 0 && Array.from({ length: endIdx - startIdx + 1 }, (_, i) => {
         const idx = startIdx + i;
         const item = items[idx];
@@ -345,6 +398,7 @@ export function Carousel3D({
             hoveredIndexRef={hoveredIndexRef}
             onCardPointerDown={handleCardPointerDown}
             onCardPointerUp={handleCardPointerUp}
+            onCardPointerMove={handleCardPointerMove}
             onCardPointerEnter={handleCardPointerEnter}
             onCardPointerLeave={handleCardPointerLeave}
           />
@@ -363,13 +417,14 @@ interface MemoCardProps {
   hoveredIndexRef: React.MutableRefObject<number | null>;
   onCardPointerDown: (cardIndex: number, e: any) => void;
   onCardPointerUp: (e: any) => void;
+  onCardPointerMove: (e: any) => void;
   onCardPointerEnter: (cardIndex: number, e: any) => void;
   onCardPointerLeave: (cardIndex: number, e: any) => void;
 }
 
 const MemoCard = memo(function MemoCardInner({
   item, itemIndex, isFlipped, scrollOffsetRef, hoveredIndexRef,
-  onCardPointerDown, onCardPointerUp, onCardPointerEnter, onCardPointerLeave,
+  onCardPointerDown, onCardPointerUp, onCardPointerMove, onCardPointerEnter, onCardPointerLeave,
 }: MemoCardProps) {
   const handleDown = useCallback((e: any) => onCardPointerDown(itemIndex, e), [onCardPointerDown, itemIndex]);
   const handleEnter = useCallback((e: any) => onCardPointerEnter(itemIndex, e), [onCardPointerEnter, itemIndex]);
@@ -384,6 +439,7 @@ const MemoCard = memo(function MemoCardInner({
       hoveredIndexRef={hoveredIndexRef}
       onCardPointerDown={handleDown}
       onCardPointerUp={onCardPointerUp}
+      onCardPointerMove={onCardPointerMove}
       onCardPointerEnter={handleEnter}
       onCardPointerLeave={handleLeave}
     />

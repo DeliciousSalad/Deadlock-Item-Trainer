@@ -568,6 +568,7 @@ function App() {
       <XRScene
         active={xrActive}
         items={filteredItems}
+        totalItemCount={items.length}
         currentIndex={currentIndex}
         flippedIndex={flippedIndex}
         category={category}

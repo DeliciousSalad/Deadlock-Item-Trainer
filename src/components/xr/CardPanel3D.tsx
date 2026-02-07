@@ -31,6 +31,7 @@ interface CardPanel3DProps {
   hoveredIndexRef: MutableRefObject<number | null>;
   onCardPointerDown?: (e: any) => void;
   onCardPointerUp?: (e: any) => void;
+  onCardPointerMove?: (e: any) => void;
   onCardPointerEnter?: (e: any) => void;
   onCardPointerLeave?: (e: any) => void;
 }
@@ -43,6 +44,7 @@ export const CardPanel3D = memo(function CardPanel3D({
   hoveredIndexRef,
   onCardPointerDown,
   onCardPointerUp,
+  onCardPointerMove,
   onCardPointerEnter,
   onCardPointerLeave,
 }: CardPanel3DProps) {
@@ -156,6 +158,7 @@ export const CardPanel3D = memo(function CardPanel3D({
         renderOrder={1}
         onPointerDown={onCardPointerDown}
         onPointerUp={onCardPointerUp}
+        onPointerMove={onCardPointerMove}
         onPointerEnter={onCardPointerEnter}
         onPointerLeave={onCardPointerLeave}
       >
@@ -169,6 +172,7 @@ export const CardPanel3D = memo(function CardPanel3D({
         renderOrder={1}
         onPointerDown={onCardPointerDown}
         onPointerUp={onCardPointerUp}
+        onPointerMove={onCardPointerMove}
         onPointerEnter={onCardPointerEnter}
         onPointerLeave={onCardPointerLeave}
       >

@@ -23,6 +23,7 @@ function EyeLevelGroup({ children }: { children: ReactNode }) {
   const settled = useRef(false);
   const samples = useRef<number[]>([]);
   const frameCount = useRef(0);
+  const [visible, setVisible] = useState(false);
 
   useFrame(() => {
     frameCount.current++;
@@ -43,6 +44,7 @@ function EyeLevelGroup({ children }: { children: ReactNode }) {
             ? sorted[mid]
             : (sorted[mid - 1] + sorted[mid]) / 2;
           settled.current = true;
+          setVisible(true);
         }
       }
 
@@ -51,6 +53,7 @@ function EyeLevelGroup({ children }: { children: ReactNode }) {
       if (!settled.current && frameCount.current >= 300 && samples.current.length > 0) {
         eyeY.current = samples.current[samples.current.length - 1];
         settled.current = true;
+        setVisible(true);
       }
     }
 
@@ -60,7 +63,7 @@ function EyeLevelGroup({ children }: { children: ReactNode }) {
     }
   });
 
-  return <group ref={groupRef}>{children}</group>;
+  return <group ref={groupRef} visible={visible}>{children}</group>;
 }
 
 /**
@@ -183,6 +186,57 @@ function ExitXRButton({ position, category = 'all' }: { position: [number, numbe
         <meshBasicMaterial map={btnTex} transparent depthWrite={false} />
       </mesh>
     </group>
+  );
+}
+
+/* ─── Dark translucent backdrop panel ──────────────────────────── */
+
+function Backdrop3D({ position, width, height }: {
+  position: [number, number, number];
+  width: number;
+  height: number;
+}) {
+  const tex = useMemo(() => {
+    const PX_W = 512;
+    const PX_H = Math.round(PX_W * (height / width));
+    const S = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = PX_W * S;
+    canvas.height = PX_H * S;
+    const ctx = canvas.getContext('2d')!;
+    ctx.scale(S, S);
+
+    // Rounded rectangle
+    const r = 18;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(PX_W - r, 0);
+    ctx.quadraticCurveTo(PX_W, 0, PX_W, r);
+    ctx.lineTo(PX_W, PX_H - r);
+    ctx.quadraticCurveTo(PX_W, PX_H, PX_W - r, PX_H);
+    ctx.lineTo(r, PX_H);
+    ctx.quadraticCurveTo(0, PX_H, 0, PX_H - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+
+    ctx.fillStyle = 'rgba(5, 5, 15, 0.45)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }, [width, height]);
+
+  return (
+    <mesh position={position} renderOrder={-2}>
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -337,7 +391,7 @@ function DisclaimerFooter3D({ position }: { position: [number, number, number] }
       // Line 3: "Not affiliated with Valve Corporation"
       const line3Y = 70;
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#4b5563';
+      ctx.fillStyle = '#6b7280';
       ctx.font = '12px Arial, sans-serif';
       ctx.fillText('Not affiliated with Valve Corporation', W / 2, line3Y);
 
@@ -383,6 +437,7 @@ function DisclaimerFooter3D({ position }: { position: [number, number, number] }
 interface XRSceneProps {
   active: boolean;
   items: ProcessedItem[];
+  totalItemCount: number;
   currentIndex: number;
   flippedIndex: number | null;
   category: ItemCategory;
@@ -404,6 +459,7 @@ interface XRSceneProps {
 export function XRScene({
   active,
   items,
+  totalItemCount,
   currentIndex,
   flippedIndex,
   category,
@@ -448,6 +504,13 @@ export function XRScene({
 
               <EyeLevelGroup>
                 {/* All positions are relative to eye level: 0 = eyes */}
+
+                {/* Dark backdrop behind top UI (logo, exit, volume, filters) */}
+                <Backdrop3D position={[0, 0.45, -0.91]} width={1.25} height={0.32} />
+
+                {/* Dark backdrop behind bottom UI (nav controls, footer) */}
+                <Backdrop3D position={[0, -0.48, -0.91]} width={1.0} height={0.30} />
+
                 <Carousel3D
                   items={items}
                   currentIndex={currentIndex}
@@ -485,7 +548,7 @@ export function XRScene({
 
                 <LogoHeader3D
                   position={[0, 0.45, -0.9]}
-                  itemCount={items.length}
+                  itemCount={totalItemCount}
                   patchDate={patchDate}
                 />
 
