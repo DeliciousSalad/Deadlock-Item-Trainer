@@ -331,7 +331,7 @@ function LogoHeader3D({ position, itemCount, patchDate }: {
 const FOOTER_W = 600;
 const FOOTER_H = 100;
 const FOOTER_LINKS = {
-  salad:  { label: 'DeliciousSalad', url: 'https://x.com/salad_vr',    uvX: [0.42, 0.72] as const, uvY: [0.68, 0.88] as const },
+  salad:  { label: 'DeliciousSalad', url: 'https://linktr.ee/delicioussalad',    uvX: [0.42, 0.72] as const, uvY: [0.68, 0.88] as const },
   api:    { label: 'Deadlock API',   url: 'https://deadlock-api.com',   uvX: [0.40, 0.64] as const, uvY: [0.35, 0.55] as const },
 };
 

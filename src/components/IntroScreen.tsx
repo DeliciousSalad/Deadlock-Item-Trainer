@@ -89,7 +89,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
         }}>
           <span style={{ color: '#6b7280' }}>Made by</span>
           <a
-            href="https://x.com/salad_vr"
+            href="https://linktr.ee/delicioussalad"
             target="_blank"
             rel="noopener noreferrer"
             style={{ 
