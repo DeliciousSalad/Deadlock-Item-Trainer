@@ -611,9 +611,9 @@ function App() {
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
-          padding: '16px 0', // Vertical padding only - carousel needs full width
+          padding: '10px 0 12px', // Vertical padding only - carousel needs full width
           overflow: 'hidden',
-          gap: '6px',
+          gap: '4px',
         }}
       >
       {/* Header - compact on mobile */}
@@ -623,19 +623,19 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '4px',
+        gap: '2px',
       }}>
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
-          gap: '8px',
+          gap: '6px',
         }}>
           <img 
             src={`${import.meta.env.BASE_URL}images/logo_deadlock_mark_only_png.png`}
             alt="Deadlock Logo" 
             style={{ 
-              height: 'clamp(28px, 8vw, 40px)', 
+              height: 'clamp(22px, 6vw, 34px)', 
               width: 'auto',
               filter: 'brightness(0.94) sepia(0.15)',
             }}
@@ -644,7 +644,7 @@ function App() {
             src={`${import.meta.env.BASE_URL}images/logo_deadlock_word_only_png.png`}
             alt="Deadlock" 
             style={{ 
-              height: 'clamp(20px, 5vw, 28px)', 
+              height: 'clamp(16px, 4vw, 24px)', 
               width: 'auto',
               filter: 'brightness(0.94) sepia(0.15)',
             }}
@@ -652,7 +652,7 @@ function App() {
         </div>
         <p style={{ 
           color: '#fff0dc', 
-          fontSize: 'clamp(0.85rem, 3.5vw, 1.1rem)', 
+          fontSize: 'clamp(0.75rem, 3vw, 1rem)', 
           margin: 0,
           fontWeight: 700,
           letterSpacing: '0.02em',
@@ -660,13 +660,13 @@ function App() {
         }}>
           Item Trainer
         </p>
-        <p style={{ color: '#2dd4bf', fontSize: '10px', margin: 0, opacity: 0.6 }}>
+        <p style={{ color: '#2dd4bf', fontSize: '9px', margin: 0, opacity: 0.6 }}>
           {items.length} items{patchDate && ` • Patch ${patchDate}`}
         </p>
       </header>
 
       {/* Filters - compact */}
-      <div style={{ flexShrink: 0, padding: '0 12px' }}>
+      <div style={{ flexShrink: 0, padding: '0 6px' }}>
         <FilterBar
           category={category}
           onCategoryChange={handleCategoryChange}

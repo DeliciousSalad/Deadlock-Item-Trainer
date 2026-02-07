@@ -61,25 +61,25 @@ export function XRButton({ onEnterXR, category = 'all' }: XRButtonProps) {
       onClick={handleClick}
       style={{
         position: 'fixed',
-        top: '16px',
-        left: '16px',
+        top: '10px',
+        left: '10px',
         zIndex: 9998,
-        borderRadius: '12px',
+        borderRadius: '10px',
         background: `linear-gradient(135deg, ${theme.grad0} 0%, ${theme.grad1} 100%)`,
-        border: `2px solid ${theme.border}`,
+        border: `1.5px solid ${theme.border}`,
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '8px 14px',
+        gap: '5px',
+        padding: '5px 10px',
         cursor: 'pointer',
         transition: 'all 0.3s ease',
-        boxShadow: `0 0 20px ${theme.glow}`,
+        boxShadow: `0 0 12px ${theme.glow}`,
       }}
       title="Enter XR Mode (Experimental)"
     >
       <svg
-        width="20"
-        height="20"
+        width="16"
+        height="16"
         viewBox="0 0 24 24"
         fill="none"
         stroke="#fff"
@@ -98,7 +98,7 @@ export function XRButton({ onEnterXR, category = 'all' }: XRButtonProps) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
         <span style={{
           color: '#fff',
-          fontSize: '13px',
+          fontSize: '11px',
           fontWeight: 700,
           lineHeight: 1.1,
           letterSpacing: '0.02em',
@@ -107,7 +107,7 @@ export function XRButton({ onEnterXR, category = 'all' }: XRButtonProps) {
         </span>
         <span style={{
           color: 'rgba(255,255,255,0.5)',
-          fontSize: '9px',
+          fontSize: '8px',
           fontWeight: 500,
           lineHeight: 1.1,
         }}>

@@ -46,47 +46,49 @@ export function FilterBar({ category, onCategoryChange, tier, onTierChange, sort
   const isTypeDisabled = category !== 'all';
   const isTierDisabled = tier !== null;
   return (
-    <div className="flex flex-row gap-2 justify-center items-center px-2 flex-wrap">
-      {/* Category filters */}
-      <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg items-center">
-        <span className="px-1.5 py-1 text-gray-500 text-xs font-medium">Type:</span>
-        {categories.map((cat) => (
-          <button
-            key={cat.value}
-            onClick={() => { 
-              hapticTap(); 
-              // Play category panel sound when switching categories
-              if (cat.value !== category) {
-                playCategorySound(cat.value);
-              }
-              onCategoryChange(cat.value); 
-            }}
-            className={`px-2 py-1.5 rounded-md font-semibold text-xs transition-all duration-200 border border-transparent
-                       ${category === cat.value ? cat.activeColor : cat.color}`}
-          >
-            {cat.label}
-          </button>
-        ))}
+    <div className="flex flex-col gap-1 items-center px-1">
+      {/* Row 1: Type + Tier */}
+      <div className="flex flex-row gap-1.5 justify-center items-center flex-wrap">
+        {/* Category filters */}
+        <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg items-center">
+          <span className="px-1 py-0.5 text-gray-500 text-[10px] font-medium">Type:</span>
+          {categories.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => { 
+                hapticTap(); 
+                if (cat.value !== category) {
+                  playCategorySound(cat.value);
+                }
+                onCategoryChange(cat.value); 
+              }}
+              className={`px-1.5 py-1 rounded-md font-semibold text-[11px] transition-all duration-200 border border-transparent
+                         ${category === cat.value ? cat.activeColor : cat.color}`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tier filters */}
+        <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg items-center">
+          <span className="px-1 py-0.5 text-gray-500 text-[10px] font-medium">Tier:</span>
+          {tiers.map((t) => (
+            <button
+              key={t.label}
+              onClick={() => { hapticTap(); onTierChange(t.value); }}
+              className={`px-1.5 py-1 rounded-md font-bold text-[11px] transition-all duration-200 border border-transparent
+                         ${tier === t.value ? tierActiveColor : tierColor}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Tier filters */}
+      {/* Row 2: Sort */}
       <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg items-center">
-        <span className="px-1.5 py-1 text-gray-500 text-xs font-medium">Tier:</span>
-        {tiers.map((t) => (
-          <button
-            key={t.label}
-            onClick={() => { hapticTap(); onTierChange(t.value); }}
-            className={`px-2 py-1.5 rounded-md font-bold text-xs transition-all duration-200 border border-transparent
-                       ${tier === t.value ? tierActiveColor : tierColor}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Sort options */}
-      <div className="flex gap-0.5 bg-black/30 p-0.5 rounded-lg items-center">
-        <span className="px-1.5 py-1 text-gray-500 text-xs font-medium">Sort:</span>
+        <span className="px-1 py-0.5 text-gray-500 text-[10px] font-medium">Sort:</span>
         {sortOptions.map((s) => {
           const isDisabled = (s.value === 'type' && isTypeDisabled) || (s.value === 'tier' && isTierDisabled);
           return (
@@ -99,7 +101,7 @@ export function FilterBar({ category, onCategoryChange, tier, onTierChange, sort
                   onSortChange(s.value); 
                 }
               }}
-              className={`px-2 py-1.5 rounded-md font-medium text-xs transition-all duration-200 border border-transparent
+              className={`px-1.5 py-1 rounded-md font-medium text-[11px] transition-all duration-200 border border-transparent
                          ${isDisabled 
                            ? 'text-gray-600 cursor-not-allowed opacity-50' 
                            : sort === s.value 

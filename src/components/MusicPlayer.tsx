@@ -188,8 +188,8 @@ export function MusicPlayer({ autoPlay = false, categoryFilter = 'all' }: MusicP
     <div
       style={{
         position: 'fixed',
-        top: '16px',
-        right: '16px',
+        top: '10px',
+        right: '10px',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
@@ -201,8 +201,8 @@ export function MusicPlayer({ autoPlay = false, categoryFilter = 'all' }: MusicP
       <button
         onClick={togglePanel}
         style={{
-          width: '48px',
-          height: '48px',
+          width: '36px',
+          height: '36px',
           borderRadius: '50%',
           background: hasSound 
             ? colors.gradient 
@@ -223,8 +223,8 @@ export function MusicPlayer({ autoPlay = false, categoryFilter = 'all' }: MusicP
       >
         {hasSound ? (
           <svg 
-            width="20" 
-            height="20" 
+            width="16" 
+            height="16" 
             viewBox="0 0 24 24" 
             fill="none" 
             stroke="#000" 
@@ -238,8 +238,8 @@ export function MusicPlayer({ autoPlay = false, categoryFilter = 'all' }: MusicP
           </svg>
         ) : (
           <svg 
-            width="20" 
-            height="20" 
+            width="16" 
+            height="16" 
             viewBox="0 0 24 24" 
             fill="none" 
             stroke="rgba(255,255,255,0.6)" 
