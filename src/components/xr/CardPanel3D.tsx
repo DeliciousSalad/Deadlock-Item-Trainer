@@ -29,12 +29,36 @@ const HALF_VISIBLE = 3; // cards visible on each side of center
 // Content mesh position (top edge anchored to header bottom)
 const CONTENT_TOP_WORLD = CARD_H / 2 - (CONTENT_TOP_PX / TEX_H) * CARD_H;
 
-// ── Global texture cache keyed by item id + image state ──
-const textureCache = new Map<string, {
+// ── LRU texture cache — keeps at most MAX_CACHED textures, disposes oldest on eviction ──
+const MAX_CACHED = 20; // ~20 cards × 3 textures = 60 GPU textures max
+
+type CachedTextures = {
   front: THREE.CanvasTexture;
   backFrame: THREE.CanvasTexture;
   backContent: THREE.CanvasTexture;
-}>();
+};
+
+const textureCache = new Map<string, CachedTextures>();
+const textureLRU: string[] = []; // oldest at front, newest at back
+
+function touchCache(key: string) {
+  const idx = textureLRU.indexOf(key);
+  if (idx !== -1) textureLRU.splice(idx, 1);
+  textureLRU.push(key);
+}
+
+function evictOldTextures() {
+  while (textureLRU.length > MAX_CACHED) {
+    const oldKey = textureLRU.shift()!;
+    const entry = textureCache.get(oldKey);
+    if (entry) {
+      entry.front.dispose();
+      entry.backFrame.dispose();
+      entry.backContent.dispose();
+      textureCache.delete(oldKey);
+    }
+  }
+}
 
 interface CardPanel3DProps {
   item: ProcessedItem;
@@ -92,28 +116,50 @@ export const CardPanel3D = memo(function CardPanel3D({
     return () => { img.onload = null; img.onerror = null; };
   }, [item.id, item.image]);
 
-  // Canvas-rendered textures — cached globally.
+  // Canvas-rendered textures — LRU cached globally.
   const { frontTex, backFrameTex, backContentTex } = useMemo(() => {
     const imgKey = item.id + ':img';
     const cachedWithImg = textureCache.get(imgKey);
-    if (cachedWithImg) return {
-      frontTex: cachedWithImg.front,
-      backFrameTex: cachedWithImg.backFrame,
-      backContentTex: cachedWithImg.backContent,
-    };
+    if (cachedWithImg) {
+      touchCache(imgKey);
+      return {
+        frontTex: cachedWithImg.front,
+        backFrameTex: cachedWithImg.backFrame,
+        backContentTex: cachedWithImg.backContent,
+      };
+    }
 
     const cacheKey = item.id + (itemImage ? ':img' : '');
     const cached = textureCache.get(cacheKey);
-    if (cached) return {
-      frontTex: cached.front,
-      backFrameTex: cached.backFrame,
-      backContentTex: cached.backContent,
-    };
+    if (cached) {
+      touchCache(cacheKey);
+      return {
+        frontTex: cached.front,
+        backFrameTex: cached.backFrame,
+        backContentTex: cached.backContent,
+      };
+    }
+
+    // Remove the no-image placeholder when the real image arrives
+    if (itemImage) {
+      const placeholderKey = item.id.toString();
+      const placeholder = textureCache.get(placeholderKey);
+      if (placeholder) {
+        placeholder.front.dispose();
+        placeholder.backFrame.dispose();
+        placeholder.backContent.dispose();
+        textureCache.delete(placeholderKey);
+        const idx = textureLRU.indexOf(placeholderKey);
+        if (idx !== -1) textureLRU.splice(idx, 1);
+      }
+    }
 
     const front = createFrontTexture(item, itemImage);
     const backFrame = createBackFrameTexture(item, itemImage);
     const backContent = createBackContentTexture(item);
     textureCache.set(cacheKey, { front, backFrame, backContent });
+    touchCache(cacheKey);
+    evictOldTextures();
     return { frontTex: front, backFrameTex: backFrame, backContentTex: backContent };
   }, [item, itemImage]);
 
