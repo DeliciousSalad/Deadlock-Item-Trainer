@@ -17,6 +17,8 @@ interface XRButtonProps {
 export function XRButton({ onEnterXR, category = 'all' }: XRButtonProps) {
   const [isSupported, setIsSupported] = useState<boolean | null>(null);
 
+  const [sessionMode, setSessionMode] = useState<'immersive-ar' | 'immersive-vr'>('immersive-ar');
+
   useEffect(() => {
     if (!navigator.xr) {
       setIsSupported(false);
@@ -24,13 +26,35 @@ export function XRButton({ onEnterXR, category = 'all' }: XRButtonProps) {
     }
 
     let cancelled = false;
+
+    // Check immersive-ar first, fall back to immersive-vr (Safari/visionOS uses VR with passthrough)
     navigator.xr.isSessionSupported('immersive-ar')
-      .then((supported) => { if (!cancelled) setIsSupported(supported); })
+      .then((arSupported) => {
+        if (cancelled) return;
+        if (arSupported) {
+          setSessionMode('immersive-ar');
+          setIsSupported(true);
+        } else {
+          return navigator.xr!.isSessionSupported('immersive-vr').then((vrSupported) => {
+            if (!cancelled) {
+              setSessionMode('immersive-vr');
+              setIsSupported(vrSupported);
+            }
+          });
+        }
+      })
       .catch(() => {
+        // Retry once after a short delay (some browsers need a moment)
         setTimeout(() => {
           if (cancelled) return;
           navigator.xr!.isSessionSupported('immersive-ar')
-            .then((s) => { if (!cancelled) setIsSupported(s); })
+            .then((ar) => {
+              if (cancelled) return;
+              if (ar) { setSessionMode('immersive-ar'); setIsSupported(true); return; }
+              return navigator.xr!.isSessionSupported('immersive-vr').then((vr) => {
+                if (!cancelled) { setSessionMode('immersive-vr'); setIsSupported(vr); }
+              });
+            })
             .catch(() => { if (!cancelled) setIsSupported(false); });
         }, 1000);
       });
@@ -45,12 +69,12 @@ export function XRButton({ onEnterXR, category = 'all' }: XRButtonProps) {
     const existing = xrStore.getState().session;
     if (existing) return;
 
-    // Call enterAR synchronously from the user gesture.
-    // onEnterXR mounts the Canvas; enterAR requests the XR session.
-    // The <XR> component in the Canvas picks up the session from the store.
+    // Call onEnterXR synchronously from the user gesture to mount the Canvas.
+    // Then request the XR session via the store.
     onEnterXR();
-    xrStore.enterAR().catch((err) => {
-      console.error('Failed to enter AR:', err);
+    const enterFn = sessionMode === 'immersive-vr' ? xrStore.enterVR : xrStore.enterAR;
+    enterFn().catch((err) => {
+      console.error('Failed to enter XR:', err);
     });
   };
 
