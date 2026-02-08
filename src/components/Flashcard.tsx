@@ -14,6 +14,7 @@ interface FlashcardProps {
   onFlip?: () => void;
   isImageLoaded?: boolean;
   isActive?: boolean;
+  cardWidth?: number;
 }
 
 // Convert tier number to Roman numeral
@@ -323,7 +324,7 @@ function parseDescription(description: string): React.ReactNode {
   });
 }
 
-export function Flashcard({ item, showAnswer: externalShowAnswer, onFlip, isImageLoaded = true, isActive = true }: FlashcardProps) {
+export function Flashcard({ item, showAnswer: externalShowAnswer, onFlip, isImageLoaded = true, isActive = true, cardWidth }: FlashcardProps) {
   const [internalFlipped, setInternalFlipped] = useState(false);
   const prevItemIdRef = useRef(item.id);
   const shouldAnimateRef = useRef(false); // Start with no animation
@@ -392,8 +393,6 @@ export function Flashcard({ item, showAnswer: externalShowAnswer, onFlip, isImag
           maxHeight: '100%',
           // Disable double-tap-zoom delay so click/tap fires immediately on touch
           touchAction: 'manipulation',
-          // When height is the constraint, width adjusts via aspect-ratio
-          // object-fit doesn't work on divs, but aspect-ratio handles this
         }}
         onPointerEnter={() => playHoverSound(item.type)}
       >
@@ -575,6 +574,7 @@ export function Flashcard({ item, showAnswer: externalShowAnswer, onFlip, isImag
             flexDirection: 'column',
             background: colors.bg,
             cursor: 'pointer',
+            zoom: cardWidth ? Math.min(1, cardWidth / BASE_CARD_WIDTH) : undefined,
           }}
         >
           {/* Header */}

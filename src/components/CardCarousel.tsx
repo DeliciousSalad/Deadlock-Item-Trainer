@@ -132,17 +132,14 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
   
   // Height-driven card width: fill vertical space, let aspect-ratio set width
   const CARD_ASPECT = 280 / 380; // must match Flashcard BASE_CARD_WIDTH/HEIGHT
-  const ROTATION_CLEARANCE = 24; // 12px top + 12px bottom so flipped cards don't clip
+  const ROTATION_CLEARANCE = 48; // gap at top + bottom so cards don't crowd header/footer
 
   const computedCardWidth = useMemo(() => {
-    if (containerWidth === 0) return 260; // fallback
-    if (containerHeight > 0) {
-      const maxH = containerHeight - ROTATION_CLEARANCE;
-      // Width from height via aspect ratio, capped by viewport width
-      return Math.min(maxH * CARD_ASPECT, containerWidth * 0.75, 340);
-    }
-    return Math.min(containerWidth * 0.60, 260);
-  }, [containerWidth, containerHeight]);
+    if (containerHeight <= 0) return 220; // fallback
+    const maxH = containerHeight - ROTATION_CLEARANCE;
+    // Purely height-driven with a hard max so desktop doesn't get too big
+    return Math.min(maxH * CARD_ASPECT, 280);
+  }, [containerHeight]);
 
   // Calculate render window based on container width
   const renderWindow = useMemo(() => {
@@ -928,6 +925,7 @@ export const CardCarousel = forwardRef<CardCarouselHandle, CardCarouselProps>(fu
               onFlip={() => handleCardFlip(index)}
               isImageLoaded={loadedImages.has(item.id)}
               isActive={index === currentIndex}
+              cardWidth={computedCardWidth}
             />
           </div>
         );
