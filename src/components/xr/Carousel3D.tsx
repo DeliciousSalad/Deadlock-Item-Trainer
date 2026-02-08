@@ -101,17 +101,24 @@ export function Carousel3D({
   // Thumbstick
   const thumbstickCooldownRef = useRef(0);
 
-  // When true, useFrame is tracking XR input — disable R3F onPointerMove to avoid coordinate space conflicts
+  // When true, useFrame is tracking gamepad-based XR input (Quest controllers) —
+  // disable R3F onPointerMove to avoid coordinate space conflicts.
+  // Stays false for gaze/transient-pointer sources which rely on R3F pointer events.
   const xrTrackingRef = useRef(false);
 
   // Touch-based drag (reliable fallback for phone XR where XR input sources are unreliable)
   const touchDraggingRef = useRef(false);
   const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
   const touchStartScrollRef = useRef(0);
+  const touchStartScrollYRef2 = useRef(0); // card scroll Y at touch start
   const touchScreenWRef = useRef(360); // viewport width captured at touch start
   const touchLastXRef = useRef(0);
+  const touchLastYRef = useRef(0);
   const touchLastTimeRef = useRef(0);
   const touchVelocityRef = useRef(0);
+  const touchScrollVelocityRef = useRef(0);
+  const touchDragAxisRef = useRef<'none' | 'horizontal' | 'vertical'>('none');
 
   // Stable refs to latest props
   const itemsRef = useRef(items);
@@ -139,64 +146,130 @@ export function Carousel3D({
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
       touchStartXRef.current = x;
+      touchStartYRef.current = y;
       touchStartScrollRef.current = scrollOffsetRef.current;
+      touchStartScrollYRef2.current = cardScrollYRef.current;
       // Capture the actual viewport width NOW — stable for this entire gesture,
       // works in both portrait and landscape, and correct even during XR sessions.
       touchScreenWRef.current = window.innerWidth || screen.width || 360;
       touchLastXRef.current = x;
+      touchLastYRef.current = y;
       touchLastTimeRef.current = performance.now();
       touchVelocityRef.current = 0;
+      touchScrollVelocityRef.current = 0;
       touchDraggingRef.current = false;
+      touchDragAxisRef.current = 'none';
+      // Reset card index — only set if handleCardPointerDown fires for this touch.
+      // Prevents stale index from triggering a flip when tapping UI buttons.
+      pointerCardIndexRef.current = -1;
     };
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
       const now = performance.now();
       const dt = (now - touchLastTimeRef.current) / 1000;
-      const pxDelta = x - touchStartXRef.current;
+      const pxDeltaX = x - touchStartXRef.current;
+      const pxDeltaY = y - touchStartYRef.current;
       const sw = touchScreenWRef.current; // use width captured at touch start
 
-      // Activate drag mode once past threshold
-      if (!touchDraggingRef.current && Math.abs(pxDelta) > TOUCH_DRAG_THRESHOLD) {
-        touchDraggingRef.current = true;
-        isDraggingRef.current = true; // tell pointer system this is a drag, not a tap
-        pointerActiveRef.current = false; // disable XR input tracking
-        momentumRef.current = 0;
+      // Activate drag mode once past threshold — lock axis
+      if (!touchDraggingRef.current) {
+        const absX = Math.abs(pxDeltaX);
+        const absY = Math.abs(pxDeltaY);
+        if (absX > TOUCH_DRAG_THRESHOLD || absY > TOUCH_DRAG_THRESHOLD) {
+          touchDraggingRef.current = true;
+          isDraggingRef.current = true;
+          pointerActiveRef.current = false;
+          momentumRef.current = 0;
+
+          // Direction lock: vertical card scroll if center card is flipped & scrollable
+          const isCenterFlipped = flippedIndexRef.current === currentIndexRef.current && cardScrollMaxRef.current > 0;
+          if (isCenterFlipped && absY > absX) {
+            touchDragAxisRef.current = 'vertical';
+          } else {
+            touchDragAxisRef.current = 'horizontal';
+          }
+        }
       }
 
       if (touchDraggingRef.current) {
-        const normDelta = pxDelta / sw;
-        if (dt > 0.001) {
-          const rawVel = ((x - touchLastXRef.current) / sw) / dt;
-          touchVelocityRef.current = touchVelocityRef.current * 0.6 + rawVel * 0.4;
+        if (touchDragAxisRef.current === 'vertical') {
+          // Card content scroll
+          if (dt > 0.001) {
+            const rawVel = (y - touchLastYRef.current) / dt;
+            touchScrollVelocityRef.current = touchScrollVelocityRef.current * 0.6 + rawVel * 0.4;
+          }
+          const TOUCH_SCROLL_SENSITIVITY = 3.0; // px → content-px multiplier
+          cardScrollYRef.current = touchStartScrollYRef2.current - pxDeltaY * TOUCH_SCROLL_SENSITIVITY;
+          cardScrollYRef.current = Math.max(0, Math.min(cardScrollMaxRef.current, cardScrollYRef.current));
+        } else {
+          // Carousel drag
+          const normDelta = pxDeltaX / sw;
+          if (dt > 0.001) {
+            const rawVel = ((x - touchLastXRef.current) / sw) / dt;
+            touchVelocityRef.current = touchVelocityRef.current * 0.6 + rawVel * 0.4;
+          }
+          scrollOffsetRef.current = touchStartScrollRef.current - normDelta * TOUCH_SENSITIVITY;
+          const len = itemsRef.current.length;
+          scrollOffsetRef.current = Math.max(-0.3, Math.min(len - 0.7, scrollOffsetRef.current));
         }
-        scrollOffsetRef.current = touchStartScrollRef.current - normDelta * TOUCH_SENSITIVITY;
-        const len = itemsRef.current.length;
-        scrollOffsetRef.current = Math.max(-0.3, Math.min(len - 0.7, scrollOffsetRef.current));
       }
 
       touchLastXRef.current = x;
+      touchLastYRef.current = y;
       touchLastTimeRef.current = now;
     };
 
     const onTouchEnd = () => {
-      if (!touchDraggingRef.current) return;
-      touchDraggingRef.current = false;
-
-      const vel = touchVelocityRef.current;
-      if (Math.abs(vel) > 0.15) {
-        momentumRef.current = -vel * 0.02;
-      } else {
-        // Snap to nearest
-        const nearest = Math.round(scrollOffsetRef.current);
-        const clamped = Math.max(0, Math.min(itemsRef.current.length - 1, nearest));
-        if (clamped !== currentIndexRef.current) {
+      if (!touchDraggingRef.current) {
+        // No drag occurred — treat as a tap (card flip / index change)
+        const cardIdx = pointerCardIndexRef.current;
+        const idx = currentIndexRef.current;
+        const itms = itemsRef.current;
+        if (cardIdx >= 0 && cardIdx < itms.length) {
           const pos = positionRef.current;
-          const snapItem = itemsRef.current[clamped];
-          if (snapItem) playSpatialActiveSound(snapItem.type, getCardWorldPos(clamped, clamped, pos));
-          onIndexChangeRef.current(clamped);
+          const clickedItem = itms[cardIdx];
+          const cardPos = getCardWorldPos(cardIdx, idx, pos);
+          hoverCooldownRef.current = 0.5;
+          if (cardIdx === idx) {
+            if (clickedItem) playSpatialFlipSound(clickedItem.type, cardPos);
+            onFlipRef.current(cardIdx);
+          } else {
+            if (clickedItem) playSpatialActiveSound(clickedItem.type, cardPos);
+            onIndexChangeRef.current(cardIdx);
+          }
+        }
+        return;
+      }
+
+      const axis = touchDragAxisRef.current;
+      touchDraggingRef.current = false;
+      touchDragAxisRef.current = 'none';
+
+      if (axis === 'vertical') {
+        // Card scroll momentum
+        const svel = touchScrollVelocityRef.current;
+        if (Math.abs(svel) > 10) {
+          scrollMomentumRef.current = -svel * 0.08;
+        }
+      } else {
+        const vel = touchVelocityRef.current;
+        if (Math.abs(vel) > 0.15) {
+          momentumRef.current = -vel * 0.02;
+        } else {
+          // Snap to nearest
+          const nearest = Math.round(scrollOffsetRef.current);
+          const clamped = Math.max(0, Math.min(itemsRef.current.length - 1, nearest));
+          if (clamped !== currentIndexRef.current) {
+            const pos = positionRef.current;
+            const snapItem = itemsRef.current[clamped];
+            if (snapItem) playSpatialActiveSound(snapItem.type, getCardWorldPos(clamped, clamped, pos));
+            onIndexChangeRef.current(clamped);
+          }
         }
       }
     };
@@ -282,6 +355,13 @@ export function Carousel3D({
 
   const handleCardPointerDown = useCallback((cardIndex: number, e: any) => {
     e.stopPropagation();
+    // Screen-touch input is handled entirely by the window-level touch handlers.
+    // Skip R3F pointer handling to avoid double-flip (pointerup fires before touchstart).
+    const src = e.inputSource || e.nativeEvent?.inputSource;
+    if (src?.targetRayMode === 'screen') {
+      pointerCardIndexRef.current = cardIndex; // still capture which card was tapped
+      return;
+    }
     pointerActiveRef.current = true;
     pointerCardIndexRef.current = cardIndex;
     isDraggingRef.current = false;
@@ -293,9 +373,10 @@ export function Carousel3D({
     velocityRef.current = 0;
     scrollVelocityRef.current = 0;
     needsStartCaptureRef.current = true;
-    // If this event came from an XR input source, immediately claim XR tracking
-    // so handleCardPointerMove can't sneak in a frame with wrong coordinate space
-    xrTrackingRef.current = !!(e.inputSource || e.nativeEvent?.inputSource);
+    // Only claim useFrame XR tracking for gamepad-based controllers (Quest, etc.).
+    // Gaze and transient-pointer sources (Vision Pro, Galaxy XR) have no gamepad
+    // and rely entirely on R3F pointer events — don't block those.
+    xrTrackingRef.current = !!(src?.gamepad);
     lastHandTimeRef.current = performance.now();
     if (e.point) {
       pointerStartXRef.current = e.point.x;
@@ -319,7 +400,8 @@ export function Carousel3D({
     velocityRef.current = 0;
     scrollVelocityRef.current = 0;
     needsStartCaptureRef.current = true;
-    xrTrackingRef.current = !!(e.inputSource || e.nativeEvent?.inputSource);
+    const src2 = e.inputSource || e.nativeEvent?.inputSource;
+    xrTrackingRef.current = !!(src2?.gamepad);
     lastHandTimeRef.current = performance.now();
     if (e.point) {
       pointerStartXRef.current = e.point.x;
@@ -373,7 +455,7 @@ export function Carousel3D({
           const raw = (currentY - lastHandYRef.current) / dt;
           scrollVelocityRef.current = scrollVelocityRef.current * (1 - VELOCITY_SMOOTHING) + raw * VELOCITY_SMOOTHING;
         }
-        cardScrollYRef.current = pointerStartScrollYRef.current - totalDeltaY * CARD_SCROLL_SENSITIVITY;
+        cardScrollYRef.current = pointerStartScrollYRef.current + totalDeltaY * CARD_SCROLL_SENSITIVITY;
         cardScrollYRef.current = Math.max(0, Math.min(cardScrollMaxRef.current, cardScrollYRef.current));
       } else {
         // Carousel drag
@@ -514,7 +596,7 @@ export function Carousel3D({
                 const raw = (currentHandY - lastHandYRef.current) / dt;
                 scrollVelocityRef.current = scrollVelocityRef.current * (1 - VELOCITY_SMOOTHING) + raw * VELOCITY_SMOOTHING;
               }
-              cardScrollYRef.current = pointerStartScrollYRef.current - totalDeltaY * CARD_SCROLL_SENSITIVITY;
+              cardScrollYRef.current = pointerStartScrollYRef.current + totalDeltaY * CARD_SCROLL_SENSITIVITY;
               cardScrollYRef.current = Math.max(0, Math.min(cardScrollMaxRef.current, cardScrollYRef.current));
             } else {
               if (dt > 0.001) {

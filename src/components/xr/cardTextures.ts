@@ -8,6 +8,35 @@ export const TEX_H = 1434;
 // Universal scale factor (all sizes designed at 640x896, scaled up)
 const S = TEX_W / 640;
 
+/* ───────────── Layout constants (shared by frame + content textures) ───────────── */
+
+const PAD = 12 * S;           // Border thickness / outer padding
+const CORNER_R = 22 * S;      // Rounded corner radius
+const HEADER_H = 110 * S;     // Back-face header bar height (thumbnail + name)
+const CONTENT_PAD = 22 * S;   // Inner content padding from border edge
+
+// Derived inner-area bounds (pixel space)
+const IN_L = PAD;
+const IN_R = TEX_W - PAD;
+const IN_W = IN_R - IN_L;
+const LEFT_X = IN_L + CONTENT_PAD;
+const MAX_TEXT_W = IN_W - CONTENT_PAD * 2;
+
+// Content area dimensions (pixel space, for the back face)
+export const CONTENT_TOP_PX = PAD + HEADER_H;
+const CONTENT_BOTTOM_PX = TEX_H - PAD;
+const CONTENT_CLEAR_BOTTOM_PX = CONTENT_BOTTOM_PX - CORNER_R;
+
+/** Compute the pixel height of the upgrade-relationship footer for a given item. */
+export function getUpgradeFooterH(item: ProcessedItem): number {
+  const hasComponents = item.componentItems && item.componentItems.length > 0;
+  const hasUpgrades = item.upgradesTo && item.upgradesTo.length > 0;
+  if (!hasComponents && !hasUpgrades) return 0;
+  const lineCount = (hasComponents ? 1 : 0) + (hasUpgrades ? 1 : 0);
+  // divider(2) + top pad(12*S) + lines + bottom pad(16*S)
+  return 2 + 12 * S + lineCount * 34 * S + 16 * S;
+}
+
 const TYPE_COLORS: Record<string, { border: string; bg: string }> = {
   weapon:   { border: '#D4883A', bg: '#3d2a1a' },
   vitality: { border: '#4CAF50', bg: '#1e3320' },
@@ -21,23 +50,14 @@ function toRoman(n: number): string {
 }
 
 function stripHtml(html: string): string {
-  // Handle game-specific tokens before DOM parsing
   let processed = html
     .replace(/\{g:citadel_binding:'([^']+)'\}/gi, '[$1]')
     .replace(/\{[^}]*\}/g, '');
-
-  // Remove SVGs (they're inline icons, not text)
   processed = processed.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
-
-  // Convert <br> to newlines before DOM parsing
   processed = processed.replace(/<br\s*\/?>/gi, '\n');
-
-  // Use DOM to properly decode entities and extract text
   const div = document.createElement('div');
   div.innerHTML = processed;
   const text = div.textContent || div.innerText || '';
-
-  // Clean up whitespace
   return text
     .replace(/[ \t]+/g, ' ')
     .replace(/\n +/g, '\n')
@@ -123,11 +143,9 @@ export function createFrontTexture(
   const ctx = canvas.getContext('2d')!;
 
   const colors = TYPE_COLORS[item.type] || TYPE_COLORS.weapon;
-  const pad = 12 * S;
-  const r = 22 * S;
 
   // Clip entire canvas to rounded rect so corners are transparent
-  roundRect(ctx, 0, 0, TEX_W, TEX_H, r);
+  roundRect(ctx, 0, 0, TEX_W, TEX_H, CORNER_R);
   ctx.clip();
 
   // Border
@@ -136,25 +154,25 @@ export function createFrontTexture(
 
   // Inner bg
   ctx.fillStyle = colors.bg;
-  roundRect(ctx, pad, pad, TEX_W - pad * 2, TEX_H - pad * 2, r - 2);
+  roundRect(ctx, PAD, PAD, TEX_W - PAD * 2, TEX_H - PAD * 2, CORNER_R - 2);
   ctx.fill();
 
   // Image area
   const nameBarH = 160 * S;
-  const imgAreaH = TEX_H - pad - nameBarH;
+  const imgAreaH = TEX_H - PAD - nameBarH;
 
   if (itemImage) {
     ctx.save();
-    roundRectTop(ctx, pad, pad, TEX_W - pad * 2, imgAreaH - pad, r - 2);
+    roundRectTop(ctx, PAD, PAD, TEX_W - PAD * 2, imgAreaH - PAD, CORNER_R - 2);
     ctx.clip();
     const iw = itemImage.naturalWidth;
     const ih = itemImage.naturalHeight;
-    const areaW = TEX_W - pad * 2;
-    const areaH = imgAreaH - pad;
+    const areaW = TEX_W - PAD * 2;
+    const areaH = imgAreaH - PAD;
     const scale = Math.max(areaW / iw, areaH / ih);
     const dw = iw * scale;
     const dh = ih * scale;
-    ctx.drawImage(itemImage, pad + (areaW - dw) / 2, pad, dw, dh);
+    ctx.drawImage(itemImage, PAD + (areaW - dw) / 2, PAD, dw, dh);
     ctx.restore();
   }
 
@@ -162,27 +180,27 @@ export function createFrontTexture(
   const badgeSize = 120 * S;
   ctx.fillStyle = colors.border;
   ctx.beginPath();
-  ctx.moveTo(TEX_W - pad, pad);
-  ctx.lineTo(TEX_W - pad, pad + badgeSize);
-  ctx.lineTo(TEX_W - pad - badgeSize, pad);
+  ctx.moveTo(TEX_W - PAD, PAD);
+  ctx.lineTo(TEX_W - PAD, PAD + badgeSize);
+  ctx.lineTo(TEX_W - PAD - badgeSize, PAD);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#000';
   ctx.font = `bold ${Math.round(44 * S)}px serif`;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.fillText(toRoman(item.tier), TEX_W - pad - 14 * S, pad + 8 * S);
+  ctx.fillText(toRoman(item.tier), TEX_W - PAD - 14 * S, PAD + 8 * S);
 
   // Name bar
   const nameBarY = TEX_H - nameBarH;
   ctx.fillStyle = colors.bg;
   ctx.beginPath();
-  ctx.moveTo(pad, nameBarY);
-  ctx.lineTo(TEX_W - pad, nameBarY);
-  ctx.lineTo(TEX_W - pad, TEX_H - pad - r);
-  ctx.quadraticCurveTo(TEX_W - pad, TEX_H - pad, TEX_W - pad - r, TEX_H - pad);
-  ctx.lineTo(pad + r, TEX_H - pad);
-  ctx.quadraticCurveTo(pad, TEX_H - pad, pad, TEX_H - pad - r);
+  ctx.moveTo(PAD, nameBarY);
+  ctx.lineTo(TEX_W - PAD, nameBarY);
+  ctx.lineTo(TEX_W - PAD, TEX_H - PAD - CORNER_R);
+  ctx.quadraticCurveTo(TEX_W - PAD, TEX_H - PAD, TEX_W - PAD - CORNER_R, TEX_H - PAD);
+  ctx.lineTo(PAD + CORNER_R, TEX_H - PAD);
+  ctx.quadraticCurveTo(PAD, TEX_H - PAD, PAD, TEX_H - PAD - CORNER_R);
   ctx.closePath();
   ctx.fill();
 
@@ -202,7 +220,7 @@ export function createFrontTexture(
   if (item.isImbue) {
     const tagY = nameBarY - 56 * S;
     ctx.fillStyle = '#9C6FDF';
-    ctx.fillRect(pad, tagY, TEX_W - pad * 2, 50 * S);
+    ctx.fillRect(PAD, tagY, TEX_W - PAD * 2, 50 * S);
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${Math.round(26 * S)}px Arial, sans-serif`;
     ctx.textAlign = 'center';
@@ -230,106 +248,220 @@ export function createFrontTexture(
 }
 
 /* ═══════════════════════════════════════════════════
-   BACK FACE  — matches 2D Flashcard.tsx
-   Supports scrolling: content taller than TEX_H gets
-   a scrollable texture with UV offset control.
+   BACK FACE — FRAME (static layer)
+   Border + header + bottom strip. Content area is
+   transparent so the scrollable content mesh shows
+   through from behind.
    ═══════════════════════════════════════════════════ */
 
-export function createBackTexture(
+export function createBackFrameTexture(
   item: ProcessedItem,
   itemImage: HTMLImageElement | null,
 ): THREE.CanvasTexture {
-  /** Inner drawing function. Draws all back-face content onto a canvas of
-   *  the given height and returns the final Y cursor position. */
-  function draw(canvasH: number): { canvas: HTMLCanvasElement; finalY: number } {
+  const canvas = document.createElement('canvas');
+  canvas.width = TEX_W;
+  canvas.height = TEX_H;
+  const ctx = canvas.getContext('2d')!;
+
+  const colors = TYPE_COLORS[item.type] || TYPE_COLORS.weapon;
+
+  // Clip to rounded rect
+  roundRect(ctx, 0, 0, TEX_W, TEX_H, CORNER_R);
+  ctx.clip();
+
+  // Border fill
+  ctx.fillStyle = colors.border;
+  ctx.fillRect(0, 0, TEX_W, TEX_H);
+
+  // Inner bg
+  ctx.fillStyle = colors.bg;
+  roundRect(ctx, PAD, PAD, IN_W, TEX_H - PAD * 2, CORNER_R - 2);
+  ctx.fill();
+
+  /* ──── HEADER BAR ──── */
+  let y = PAD;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.beginPath();
+  ctx.moveTo(IN_L + CORNER_R, y);
+  ctx.lineTo(IN_R - CORNER_R, y);
+  ctx.quadraticCurveTo(IN_R, y, IN_R, y + CORNER_R);
+  ctx.lineTo(IN_R, y + HEADER_H);
+  ctx.lineTo(IN_L, y + HEADER_H);
+  ctx.lineTo(IN_L, y + CORNER_R);
+  ctx.quadraticCurveTo(IN_L, y, IN_L + CORNER_R, y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Divider line under header
+  ctx.strokeStyle = colors.border;
+  ctx.lineWidth = 3 * S;
+  ctx.beginPath();
+  ctx.moveTo(IN_L, y + HEADER_H);
+  ctx.lineTo(IN_R, y + HEADER_H);
+  ctx.stroke();
+
+  // Thumbnail
+  const thumbS = 70 * S;
+  const thumbX = IN_L + CONTENT_PAD;
+  const thumbY = y + (HEADER_H - thumbS) / 2;
+  if (itemImage) {
+    ctx.save();
+    roundRect(ctx, thumbX, thumbY, thumbS, thumbS, 6 * S);
+    ctx.clip();
+    ctx.drawImage(itemImage, thumbX, thumbY, thumbS, thumbS);
+    ctx.restore();
+  }
+
+  // Name text
+  const hTextX = thumbX + thumbS + 18 * S;
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.round(32 * S)}px Arial, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  let headerName = item.displayName;
+  const maxHeaderNameW = IN_R - hTextX - CONTENT_PAD;
+  while (ctx.measureText(headerName).width > maxHeaderNameW && headerName.length > 3) {
+    headerName = headerName.slice(0, -1);
+  }
+  if (headerName !== item.displayName) headerName += '…';
+  ctx.fillText(headerName, hTextX, y + HEADER_H / 2 - 18 * S);
+
+  // Cost & Tier subtitle
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = `${Math.round(24 * S)}px Arial, sans-serif`;
+  ctx.fillText(
+    `${item.tier === 5 ? 'Legendary' : item.cost}  •  Tier ${item.tier}`,
+    hTextX, y + HEADER_H / 2 + 18 * S,
+  );
+
+  /* ──── UPGRADE FOOTER (anchored to card bottom with rounded corners) ──── */
+  const footerH = getUpgradeFooterH(item);
+  const footerTop = CONTENT_CLEAR_BOTTOM_PX - footerH;
+
+  if (footerH > 0) {
+    const hasComponents = item.componentItems && item.componentItems.length > 0;
+    const hasUpgrades = item.upgradesTo && item.upgradesTo.length > 0;
+
+    let fy = footerTop;
+
+    // Divider line
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(IN_L, fy, IN_W, 2);
+    fy += 2;
+
+    // Background — extends to bottom with rounded corners
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.moveTo(IN_L, fy);
+    ctx.lineTo(IN_R, fy);
+    ctx.lineTo(IN_R, CONTENT_BOTTOM_PX - (CORNER_R - 2));
+    ctx.quadraticCurveTo(IN_R, CONTENT_BOTTOM_PX, IN_R - (CORNER_R - 2), CONTENT_BOTTOM_PX);
+    ctx.lineTo(IN_L + (CORNER_R - 2), CONTENT_BOTTOM_PX);
+    ctx.quadraticCurveTo(IN_L, CONTENT_BOTTOM_PX, IN_L, CONTENT_BOTTOM_PX - (CORNER_R - 2));
+    ctx.closePath();
+    ctx.fill();
+
+    // Vertically center text within the footer box
+    const lineCount = (hasComponents ? 1 : 0) + (hasUpgrades ? 1 : 0);
+    const textBlockH = lineCount * 34 * S;
+    const boxTop = footerTop + 2; // after divider
+    fy = boxTop + (CONTENT_BOTTOM_PX - boxTop - textBlockH) / 2 + 5 * S;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    if (hasComponents) {
+      ctx.font = `${Math.round(22 * S)}px Arial, sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      const prefix = 'Upgrades from: ';
+      ctx.fillText(prefix, LEFT_X, fy);
+      const prefixW = ctx.measureText(prefix).width;
+      ctx.fillStyle = '#ffd700';
+      ctx.fillText(
+        item.componentItems.map(c => c.name).join(', '),
+        LEFT_X + prefixW, fy,
+        MAX_TEXT_W - prefixW,
+      );
+      fy += 34 * S;
+    }
+
+    if (hasUpgrades) {
+      ctx.font = `${Math.round(22 * S)}px Arial, sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      const prefix = 'Upgrades to: ';
+      ctx.fillText(prefix, LEFT_X, fy);
+      const prefixW = ctx.measureText(prefix).width;
+      ctx.fillStyle = '#69db7c';
+      ctx.fillText(
+        item.upgradesTo.map(u => u.name).join(', '),
+        LEFT_X + prefixW, fy,
+        MAX_TEXT_W - prefixW,
+      );
+    }
+  }
+
+  /* ──── Punch out the content area (make it transparent) ──── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = 'rgba(0,0,0,1)';
+  ctx.fillRect(IN_L, CONTENT_TOP_PX, IN_W, footerTop - CONTENT_TOP_PX - 2);
+  ctx.restore();
+
+  // Bottom strip with rounded corners (only needed when no footer)
+  if (footerH === 0) {
+    ctx.fillStyle = colors.bg;
+    ctx.beginPath();
+    ctx.moveTo(IN_L, CONTENT_CLEAR_BOTTOM_PX);
+    ctx.lineTo(IN_R, CONTENT_CLEAR_BOTTOM_PX);
+    ctx.lineTo(IN_R, CONTENT_BOTTOM_PX - (CORNER_R - 2));
+    ctx.quadraticCurveTo(IN_R, CONTENT_BOTTOM_PX, IN_R - (CORNER_R - 2), CONTENT_BOTTOM_PX);
+    ctx.lineTo(IN_L + (CORNER_R - 2), CONTENT_BOTTOM_PX);
+    ctx.quadraticCurveTo(IN_L, CONTENT_BOTTOM_PX, IN_L, CONTENT_BOTTOM_PX - (CORNER_R - 2));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  (texture as any)._footerH = footerH;
+  return texture;
+}
+
+/* ═══════════════════════════════════════════════════
+   BACK FACE — CONTENT (scrollable layer)
+   Stats, descriptions, upgrades — no border, no header.
+   Sits behind the frame mesh and scrolls via UV offset.
+   ═══════════════════════════════════════════════════ */
+
+export function createBackContentTexture(
+  item: ProcessedItem,
+): THREE.CanvasTexture {
+  const colors = TYPE_COLORS[item.type] || TYPE_COLORS.weapon;
+  const footerH = getUpgradeFooterH(item);
+  const contentAreaPx = CONTENT_CLEAR_BOTTOM_PX - CONTENT_TOP_PX - footerH;
+
+  /** Draw all scrollable content onto a canvas of the given height.
+   *  Returns the canvas and the final Y cursor position. */
+  function drawContent(canvasH: number): { canvas: HTMLCanvasElement; finalY: number } {
     const canvas = document.createElement('canvas');
     canvas.width = TEX_W;
     canvas.height = canvasH;
     const ctx = canvas.getContext('2d')!;
 
-    const colors = TYPE_COLORS[item.type] || TYPE_COLORS.weapon;
-    const pad = 12 * S;
-    const r = 22 * S;
-    const inL = pad;
-    const inR = TEX_W - pad;
-    const inW = inR - inL;
-    const cPad = 22 * S;
-    const leftX = inL + cPad;
-    const maxTextW = inW - cPad * 2;
-
-    // Clip entire canvas to rounded rect
-    roundRect(ctx, 0, 0, TEX_W, canvasH, r);
-    ctx.clip();
-
-    // Border
-    ctx.fillStyle = colors.border;
+    // Fill with card bg color (the frame masks the edges)
+    ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, TEX_W, canvasH);
 
-    // Inner bg
-    ctx.fillStyle = colors.bg;
-    roundRect(ctx, pad, pad, inW, canvasH - pad * 2, r - 2);
-    ctx.fill();
+    // Left/right border strips (visible behind the frame's border area)
+    ctx.fillStyle = colors.border;
+    ctx.fillRect(0, 0, PAD, canvasH);
+    ctx.fillRect(TEX_W - PAD, 0, PAD, canvasH);
 
-    let y = pad;
+    let y = 0;
 
-    /* ──── HEADER BAR ──── */
-    const headerH = 110 * S;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.beginPath();
-    ctx.moveTo(inL + r, y);
-    ctx.lineTo(inR - r, y);
-    ctx.quadraticCurveTo(inR, y, inR, y + r);
-    ctx.lineTo(inR, y + headerH);
-    ctx.lineTo(inL, y + headerH);
-    ctx.lineTo(inL, y + r);
-    ctx.quadraticCurveTo(inL, y, inL + r, y);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 3 * S;
-    ctx.beginPath();
-    ctx.moveTo(inL, y + headerH);
-    ctx.lineTo(inR, y + headerH);
-    ctx.stroke();
-
-    // Thumbnail
-    const thumbS = 70 * S;
-    const thumbX = inL + cPad;
-    const thumbY = y + (headerH - thumbS) / 2;
-    if (itemImage) {
-      ctx.save();
-      roundRect(ctx, thumbX, thumbY, thumbS, thumbS, 6 * S);
-      ctx.clip();
-      ctx.drawImage(itemImage, thumbX, thumbY, thumbS, thumbS);
-      ctx.restore();
-    }
-
-    // Name
-    const hTextX = thumbX + thumbS + 18 * S;
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${Math.round(32 * S)}px Arial, sans-serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    let headerName = item.displayName;
-    const maxHeaderNameW = inR - hTextX - cPad;
-    while (ctx.measureText(headerName).width > maxHeaderNameW && headerName.length > 3) {
-      headerName = headerName.slice(0, -1);
-    }
-    if (headerName !== item.displayName) headerName += '…';
-    ctx.fillText(headerName, hTextX, y + headerH / 2 - 18 * S);
-
-    // Cost & Tier subtitle
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = `${Math.round(24 * S)}px Arial, sans-serif`;
-    ctx.fillText(
-      `${item.tier === 5 ? 'Legendary' : item.cost}  •  Tier ${item.tier}`,
-      hTextX, y + headerH / 2 + 18 * S,
-    );
-
-    y += headerH;
-
-    /* ──── Reusable drawing helpers (use `y` as cursor) ──── */
+    /* ──── Drawing helpers (close over ctx, y, layout constants) ──── */
 
     function drawInnateRows(stats: StatInfo[]) {
       const rowH = 38 * S;
@@ -340,8 +472,8 @@ export function createBackTexture(
         ctx.font = `bold ${Math.round(26 * S)}px Arial, sans-serif`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(stat.value, leftX, y);
-        let cx = leftX + ctx.measureText(stat.value).width + 12 * S;
+        ctx.fillText(stat.value, LEFT_X, y);
+        let cx = LEFT_X + ctx.measureText(stat.value).width + 12 * S;
         if (stat.scalesWith) {
           ctx.font = `bold ${Math.round(18 * S)}px Arial, sans-serif`;
           ctx.fillStyle = getScaleColor(stat.scalesWith);
@@ -352,7 +484,7 @@ export function createBackTexture(
         ctx.fillStyle = 'rgba(255,255,255,0.85)';
         ctx.font = `${stat.hasBuiltInCondition ? 'bold ' : ''}${Math.round(24 * S)}px Arial, sans-serif`;
         const label = stat.label;
-        ctx.fillText(label, cx, y + 2 * S, inR - cx - cPad);
+        ctx.fillText(label, cx, y + 2 * S, IN_R - cx - CONTENT_PAD);
         if (stat.isConditional) {
           const labelW = ctx.measureText(label).width;
           ctx.fillStyle = '#ffa500';
@@ -363,7 +495,7 @@ export function createBackTexture(
       }
       y += sectionPadY - 6 * S;
       ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.fillRect(inL, y, inW, 2);
+      ctx.fillRect(IN_L, y, IN_W, 2);
       y += 2;
     }
 
@@ -373,7 +505,7 @@ export function createBackTexture(
       const gridPad = 16 * S;
       const gap = 12 * S;
       const cols = 2;
-      const cellW = (inW - gridPad * 2 - gap) / cols;
+      const cellW = (IN_W - gridPad * 2 - gap) / cols;
       const cellH = 86 * S;
       const rows = Math.ceil(filtered.length / cols);
       y += 10 * S;
@@ -382,7 +514,7 @@ export function createBackTexture(
           const idx = row * cols + col;
           if (idx >= filtered.length) break;
           const stat = filtered[idx];
-          const cx = inL + gridPad + col * (cellW + gap);
+          const cx = IN_L + gridPad + col * (cellW + gap);
           const cy = y;
           ctx.fillStyle = 'rgba(0,0,0,0.3)';
           roundRect(ctx, cx, cy, cellW, cellH, 8 * S);
@@ -418,19 +550,19 @@ export function createBackTexture(
     function drawSectionHeader(label: string, cooldown?: string) {
       const barH = 48 * S;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(inL, y, inW, barH);
+      ctx.fillRect(IN_L, y, IN_W, barH);
       ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.fillRect(inL, y + barH, inW, 2);
+      ctx.fillRect(IN_L, y + barH, IN_W, 2);
       ctx.font = `bold ${Math.round(20 * S)}px Arial, sans-serif`;
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label.toUpperCase(), leftX, y + barH / 2);
+      ctx.fillText(label.toUpperCase(), LEFT_X, y + barH / 2);
       if (cooldown) {
         ctx.font = `${Math.round(20 * S)}px Arial, sans-serif`;
         ctx.fillStyle = 'rgba(255,255,255,0.65)';
         ctx.textAlign = 'right';
-        ctx.fillText(`⏱ ${cooldown}`, inR - cPad, y + barH / 2);
+        ctx.fillText(`⏱ ${cooldown}`, IN_R - CONTENT_PAD, y + barH / 2);
       }
       y += barH + 2;
     }
@@ -439,18 +571,17 @@ export function createBackTexture(
       const clean = stripHtml(desc);
       if (!clean || clean.replace(/[.\s…]+/g, '').length < 3) return;
       ctx.font = `${Math.round(24 * S)}px Arial, sans-serif`;
-      const lines = wrapText(ctx, clean, maxTextW - 12 * S);
+      const lines = wrapText(ctx, clean, MAX_TEXT_W - 12 * S);
       const lineH = 33 * S;
-      // Render ALL lines (scrolling handles overflow)
       const blockH = lines.length * lineH + 24 * S;
       ctx.fillStyle = bgColor;
-      ctx.fillRect(inL, y, inW, blockH);
+      ctx.fillRect(IN_L, y, IN_W, blockH);
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.font = `${Math.round(24 * S)}px Arial, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], leftX + 4 * S, y + 12 * S + i * lineH, maxTextW - 8 * S);
+        ctx.fillText(lines[i], LEFT_X + 4 * S, y + 12 * S + i * lineH, MAX_TEXT_W - 8 * S);
       }
       y += blockH;
     }
@@ -498,95 +629,35 @@ export function createBackTexture(
       }
     }
 
-    /* ──────── UPGRADE RELATIONSHIPS (bottom) ──────── */
-    const hasComponents = item.componentItems && item.componentItems.length > 0;
-    const hasUpgrades = item.upgradesTo && item.upgradesTo.length > 0;
-
-    if (hasComponents || hasUpgrades) {
-      const lineCount = (hasComponents ? 1 : 0) + (hasUpgrades ? 1 : 0);
-      const blockH = lineCount * 34 * S + 28 * S;
-
-      // Push toward bottom only if content fits
-      y = Math.max(y + 12 * S, canvasH - pad - blockH - 8 * S);
-
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.fillRect(inL, y, inW, 2);
-      y += 2;
-
-      // Background with rounded bottom corners
-      ctx.fillStyle = 'rgba(0,0,0,0.2)';
-      ctx.beginPath();
-      ctx.moveTo(inL, y);
-      ctx.lineTo(inR, y);
-      ctx.lineTo(inR, canvasH - pad - r);
-      ctx.quadraticCurveTo(inR, canvasH - pad, inR - r, canvasH - pad);
-      ctx.lineTo(inL + r, canvasH - pad);
-      ctx.quadraticCurveTo(inL, canvasH - pad, inL, canvasH - pad - r);
-      ctx.closePath();
-      ctx.fill();
-
-      y += 12 * S;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-
-      if (hasComponents) {
-        ctx.font = `${Math.round(22 * S)}px Arial, sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        const prefix = 'Upgrades from: ';
-        ctx.fillText(prefix, leftX, y);
-        const prefixW = ctx.measureText(prefix).width;
-        ctx.fillStyle = '#ffd700';
-        ctx.fillText(
-          item.componentItems.map(c => c.name).join(', '),
-          leftX + prefixW, y,
-          maxTextW - prefixW,
-        );
-        y += 34 * S;
-      }
-
-      if (hasUpgrades) {
-        ctx.font = `${Math.round(22 * S)}px Arial, sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        const prefix = 'Upgrades to: ';
-        ctx.fillText(prefix, leftX, y);
-        const prefixW = ctx.measureText(prefix).width;
-        ctx.fillStyle = '#69db7c';
-        ctx.fillText(
-          item.upgradesTo.map(u => u.name).join(', '),
-          leftX + prefixW, y,
-          maxTextW - prefixW,
-        );
-        y += 34 * S;
-      }
-    }
-
-    return { canvas, finalY: y + pad };
+    return { canvas, finalY: y };
   }
 
-  // ── Pass 1: draw to standard-height canvas to check if content fits ──
-  const { canvas: firstCanvas, finalY } = draw(TEX_H);
+  // ── Pass 1: draw to visible-area-height canvas to check if content fits ──
+  const { canvas: firstCanvas, finalY } = drawContent(contentAreaPx);
 
-  if (finalY <= TEX_H) {
+  if (finalY <= contentAreaPx) {
     // Content fits — no scrolling needed
     const texture = new THREE.CanvasTexture(firstCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    (texture as any)._contentHeight = TEX_H;
+    (texture as any)._contentHeight = contentAreaPx;
+    (texture as any)._contentAreaH = contentAreaPx;
     return texture;
   }
 
   // ── Pass 2: content overflows — redraw to correctly-sized canvas ──
   const contentH = Math.ceil(finalY + 20 * S);
-  const { canvas: tallCanvas } = draw(contentH);
+  const { canvas: tallCanvas } = drawContent(contentH);
 
   const texture = new THREE.CanvasTexture(tallCanvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
   (texture as any)._contentHeight = contentH;
+  (texture as any)._contentAreaH = contentAreaPx;
 
-  // Set UV to show top portion initially (viewport = TEX_H within taller texture)
-  texture.repeat.set(1, TEX_H / contentH);
-  texture.offset.set(0, 1 - TEX_H / contentH);
+  // UV: show top portion initially (viewport = contentAreaPx within taller texture)
+  texture.repeat.set(1, contentAreaPx / contentH);
+  texture.offset.set(0, 1 - contentAreaPx / contentH);
 
   return texture;
 }

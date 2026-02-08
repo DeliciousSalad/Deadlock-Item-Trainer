@@ -7,7 +7,6 @@ import { IntroScreen } from './components/IntroScreen';
 import { CardCarousel, type CardCarouselHandle } from './components/CardCarousel';
 import { XRButton } from './components/xr/XRButton';
 import { XRScene } from './components/xr/XRScene';
-import { DebugOverlay } from './components/xr/DebugOverlay';
 import type { ProcessedItem, ComponentItem, ItemCategory, RawItem } from './types';
 
 import { ITEMS_API_URL } from './constants';
@@ -823,7 +822,6 @@ function App() {
 
     {/* Music player toggle - starts playing automatically */}
     <MusicPlayer autoPlay={true} categoryFilter={category} />
-    <DebugOverlay />
     </>
   );
 }

@@ -2,7 +2,13 @@ import { useRef, useMemo, useState, useEffect, memo, type MutableRefObject } fro
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ProcessedItem } from '../../types';
-import { createFrontTexture, createBackTexture, TEX_H } from './cardTextures';
+import {
+  createFrontTexture,
+  createBackFrameTexture,
+  createBackContentTexture,
+  TEX_H,
+  CONTENT_TOP_PX,
+} from './cardTextures';
 
 const CDN_ORIGIN = 'https://assets-bucket.deadlock-api.com';
 
@@ -20,8 +26,15 @@ export const ARC_STEP = 0.255; // radians between cards
 const CARD_Y = 0;
 const HALF_VISIBLE = 3; // cards visible on each side of center
 
+// Content mesh position (top edge anchored to header bottom)
+const CONTENT_TOP_WORLD = CARD_H / 2 - (CONTENT_TOP_PX / TEX_H) * CARD_H;
+
 // ── Global texture cache keyed by item id + image state ──
-const textureCache = new Map<string, { front: THREE.CanvasTexture; back: THREE.CanvasTexture }>();
+const textureCache = new Map<string, {
+  front: THREE.CanvasTexture;
+  backFrame: THREE.CanvasTexture;
+  backContent: THREE.CanvasTexture;
+}>();
 
 interface CardPanel3DProps {
   item: ProcessedItem;
@@ -80,31 +93,44 @@ export const CardPanel3D = memo(function CardPanel3D({
   }, [item.id, item.image]);
 
   // Canvas-rendered textures — cached globally.
-  const { frontTex, backTex } = useMemo(() => {
+  const { frontTex, backFrameTex, backContentTex } = useMemo(() => {
     const imgKey = item.id + ':img';
     const cachedWithImg = textureCache.get(imgKey);
-    if (cachedWithImg) return { frontTex: cachedWithImg.front, backTex: cachedWithImg.back };
+    if (cachedWithImg) return {
+      frontTex: cachedWithImg.front,
+      backFrameTex: cachedWithImg.backFrame,
+      backContentTex: cachedWithImg.backContent,
+    };
 
     const cacheKey = item.id + (itemImage ? ':img' : '');
     const cached = textureCache.get(cacheKey);
-    if (cached) return { frontTex: cached.front, backTex: cached.back };
+    if (cached) return {
+      frontTex: cached.front,
+      backFrameTex: cached.backFrame,
+      backContentTex: cached.backContent,
+    };
 
     const front = createFrontTexture(item, itemImage);
-    const back = createBackTexture(item, itemImage);
-    textureCache.set(cacheKey, { front, back });
-    return { frontTex: front, backTex: back };
+    const backFrame = createBackFrameTexture(item, itemImage);
+    const backContent = createBackContentTexture(item);
+    textureCache.set(cacheKey, { front, backFrame, backContent });
+    return { frontTex: front, backFrameTex: backFrame, backContentTex: backContent };
   }, [item, itemImage]);
 
-  // Detect scrollable back texture and set up max scroll
-  const contentHeight = (backTex as any)._contentHeight || TEX_H;
-  const isScrollable = contentHeight > TEX_H;
-  const maxScroll = isScrollable ? contentHeight - TEX_H : 0;
+  // Detect scrollable content texture and set up max scroll
+  const contentAreaH: number = (backContentTex as any)._contentAreaH || 1;
+  const contentHeight: number = (backContentTex as any)._contentHeight || contentAreaH;
+  const isScrollable = contentHeight > contentAreaH;
+  const maxScroll = isScrollable ? contentHeight - contentAreaH : 0;
+
+  // Content mesh dimensions (per-item, depends on footer height)
+  const contentWorldH = (contentAreaH / TEX_H) * CARD_H;
+  const contentYOffset = CONTENT_TOP_WORLD - contentWorldH / 2;
 
   // Update the shared max scroll ref so the carousel can clamp
   useEffect(() => {
-    // Only set if this card is the current center/flipped card
-    if (isFlipped && isScrollable) {
-      cardScrollMaxRef.current = maxScroll;
+    if (isFlipped) {
+      cardScrollMaxRef.current = isScrollable ? maxScroll : 0;
     }
   }, [isFlipped, isScrollable, maxScroll, cardScrollMaxRef]);
 
@@ -113,14 +139,15 @@ export const CardPanel3D = memo(function CardPanel3D({
     if (!isFlipped && isScrollable) {
       cardScrollYRef.current = 0;
       // Reset texture UV to top
-      backTex.repeat.set(1, TEX_H / contentHeight);
-      backTex.offset.set(0, 1 - TEX_H / contentHeight);
-      backTex.needsUpdate = true;
+      backContentTex.repeat.set(1, contentAreaH / contentHeight);
+      backContentTex.offset.set(0, 1 - contentAreaH / contentHeight);
+      backContentTex.needsUpdate = true;
     }
-  }, [isFlipped, isScrollable, backTex, contentHeight, cardScrollYRef]);
+  }, [isFlipped, isScrollable, backContentTex, contentHeight, contentAreaH, cardScrollYRef]);
 
   const frontMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const backMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const backFrameMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const backContentMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   // Track last scroll Y for change detection
   const lastScrollYRef = useRef(0);
@@ -171,25 +198,28 @@ export const CardPanel3D = memo(function CardPanel3D({
     const s = currentScaleRef.current;
     groupRef.current.scale.set(s, s, s);
 
-    // Material opacity & brightness
+    // Material opacity & brightness (all three materials)
     const op = currentOpacityRef.current;
     const b = currentBrightnessRef.current;
     if (frontMatRef.current) {
       frontMatRef.current.opacity = op;
       frontMatRef.current.color.setRGB(b, b, b);
     }
-    if (backMatRef.current) {
-      backMatRef.current.opacity = op;
-      backMatRef.current.color.setRGB(b, b, b);
+    if (backFrameMatRef.current) {
+      backFrameMatRef.current.opacity = op;
+      backFrameMatRef.current.color.setRGB(b, b, b);
+    }
+    if (backContentMatRef.current) {
+      backContentMatRef.current.opacity = op;
+      backContentMatRef.current.color.setRGB(b, b, b);
     }
 
-    // ── Scroll UV update ──
+    // ── Scroll UV update (on the content texture) ──
     if (isScrollable && isFlipped) {
       const scrollY = cardScrollYRef.current;
       if (Math.abs(scrollY - lastScrollYRef.current) > 0.5) {
         const clamped = Math.max(0, Math.min(maxScroll, scrollY));
-        backTex.offset.y = (contentHeight - TEX_H - clamped) / contentHeight;
-        backTex.needsUpdate = true;
+        backContentTex.offset.y = (contentHeight - contentAreaH - clamped) / contentHeight;
         lastScrollYRef.current = clamped;
       }
 
@@ -199,8 +229,8 @@ export const CardPanel3D = memo(function CardPanel3D({
         scrollThumbRef.current.visible = true;
         const clamped = Math.max(0, Math.min(maxScroll, scrollY));
         const fraction = maxScroll > 0 ? clamped / maxScroll : 0;
-        const trackH = CARD_H * 0.85;
-        const thumbH = Math.max(0.03, (TEX_H / contentHeight) * trackH);
+        const trackH = contentWorldH * 0.95;
+        const thumbH = Math.max(0.03, (contentAreaH / contentHeight) * trackH);
         scrollThumbRef.current.scale.y = thumbH / 0.03; // base geo is 0.03 tall
         const thumbRange = trackH - thumbH;
         scrollThumbRef.current.position.y = (trackH / 2 - thumbH / 2) - fraction * thumbRange;
@@ -227,10 +257,20 @@ export const CardPanel3D = memo(function CardPanel3D({
         <meshBasicMaterial ref={frontMatRef} map={frontTex} transparent />
       </mesh>
 
-      {/* BACK */}
+      {/* BACK — Scrollable content (behind frame) */}
       <mesh
         rotation={[0, Math.PI, 0]}
+        position={[0, contentYOffset, -0.001]}
         renderOrder={1}
+      >
+        <planeGeometry args={[CARD_W, contentWorldH]} />
+        <meshBasicMaterial ref={backContentMatRef} map={backContentTex} transparent depthWrite={false} />
+      </mesh>
+
+      {/* BACK — Static frame (border + header, in front of content) */}
+      <mesh
+        rotation={[0, Math.PI, 0]}
+        renderOrder={2}
         onPointerDown={onCardPointerDown}
         onPointerUp={onCardPointerUp}
         onPointerMove={onCardPointerMove}
@@ -238,21 +278,21 @@ export const CardPanel3D = memo(function CardPanel3D({
         onPointerLeave={onCardPointerLeave}
       >
         <planeGeometry args={[CARD_W, CARD_H]} />
-        <meshBasicMaterial ref={backMatRef} map={backTex} transparent />
+        <meshBasicMaterial ref={backFrameMatRef} map={backFrameTex} transparent depthWrite={false} />
       </mesh>
 
-      {/* SCROLL INDICATOR (on the back face side) */}
+      {/* SCROLL INDICATOR (on the back face side, in front of frame) */}
       {isScrollable && (
-        <group rotation={[0, Math.PI, 0]} position={[-(CARD_W / 2 + 0.012), 0, 0.001]}>
+        <group rotation={[0, Math.PI, 0]} position={[-(CARD_W / 2 - 0.010), contentYOffset, 0.003]}>
           {/* Track */}
-          <mesh ref={scrollTrackRef} visible={false} renderOrder={2}>
-            <planeGeometry args={[0.008, CARD_H * 0.85]} />
-            <meshBasicMaterial color="#333333" transparent opacity={0.5} />
+          <mesh ref={scrollTrackRef} visible={false} renderOrder={4}>
+            <planeGeometry args={[0.008, contentWorldH * 0.95]} />
+            <meshBasicMaterial color="#333333" transparent opacity={0.5} depthWrite={false} />
           </mesh>
           {/* Thumb */}
-          <mesh ref={scrollThumbRef} visible={false} renderOrder={3}>
+          <mesh ref={scrollThumbRef} visible={false} renderOrder={5}>
             <planeGeometry args={[0.008, 0.03]} />
-            <meshBasicMaterial color="#aaaaaa" transparent opacity={0.8} />
+            <meshBasicMaterial color="#aaaaaa" transparent opacity={0.8} depthWrite={false} />
           </mesh>
         </group>
       )}

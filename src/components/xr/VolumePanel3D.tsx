@@ -67,15 +67,62 @@ function createPanelTexture(): THREE.CanvasTexture {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
 
-  // Music label — icon + text
-  ctx.fillStyle = '#e8a849';
+  // Music label — drawn music note icon + text
+  const musicColor = '#e8a849';
+  ctx.save();
+  ctx.strokeStyle = musicColor;
+  ctx.fillStyle = musicColor;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Note circle
+  ctx.beginPath();
+  ctx.arc(35, 99, 6, 0, Math.PI * 2);
+  ctx.fill();
+  // Stem
+  ctx.beginPath();
+  ctx.moveTo(41, 99);
+  ctx.lineTo(41, 75);
+  ctx.stroke();
+  // Flag
+  ctx.beginPath();
+  ctx.moveTo(41, 75);
+  ctx.lineTo(51, 79);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = musicColor;
   ctx.font = 'bold 20px Arial, sans-serif';
-  ctx.fillText('♫  Music', 28, 92);
+  ctx.fillText('Music', 60, 92);
 
-  // SFX label — icon + text
-  ctx.fillStyle = '#5eead4';
+  // SFX label — drawn speaker icon + text
+  const sfxColor = '#5eead4';
+  ctx.save();
+  ctx.strokeStyle = sfxColor;
+  ctx.fillStyle = sfxColor;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Speaker body
+  ctx.beginPath();
+  ctx.moveTo(38, 153);
+  ctx.lineTo(33, 156);
+  ctx.lineTo(27, 156);
+  ctx.lineTo(27, 164);
+  ctx.lineTo(33, 164);
+  ctx.lineTo(38, 167);
+  ctx.closePath();
+  ctx.fill();
+  // Sound wave arcs
+  ctx.beginPath();
+  ctx.arc(40, 160, 6, -Math.PI * 0.35, Math.PI * 0.35);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(40, 160, 11, -Math.PI * 0.35, Math.PI * 0.35);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = sfxColor;
   ctx.font = 'bold 20px Arial, sans-serif';
-  ctx.fillText('🔊  SFX', 28, 160);
+  ctx.fillText('SFX', 60, 160);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
